@@ -1,0 +1,48 @@
+{
+    "text_you": { "message": "あなた" },
+    "alert_to_change_lanauge": {
+        "message": "URL の最後に ?hl=en を加えてください。一例としては、次のようなURL に変更してください。https://meet.google.com/ccc-cccc-ccc?hl=en"
+    },
+    "alart_to_notify_no_pending_transcript": {
+        "message" : "画面に残っている字幕がありません。<br>字幕がある時に再度お試しください。"
+    },
+    "alart_to_notify_pending_transcript": {
+        "message" : "振り返り用に保存するため、単語を選んでクリックしてください。保存しない場合にはEsc を押してキャンセルしてください。<br><br>"
+    },
+    "realtime_caption_to_send_to_log": {
+        "message" : "振り返り用に誤って音声認識された箇所を保存するには単語を選んでクリックしてください。<br><br>"
+    },
+    "realtime_no_caption_to_send_to_log": {
+        "message" : "画面に残っている字幕がありません。"
+    },
+    "realtime_caption_notify_the_option": {
+        "message" : "誤って音声認識された単語を記録するには、拡張機能のオプションで unrecognized word にチェックを入れてください"
+    },
+    "show_stats_option": {
+        "message" : "発話割合などの統計を表示するには、拡張機能のオプションで Receive statistics にチェックを入れてください"
+    },
+    "show_option_feedback": {
+        "message" : "フィードバックを表示するには、拡張機能のオプションで Receive feedback にチェックを入れてください"
+    },
+    "record_log" :
+    {
+        "message" : "「$action$」としてを振り返り用に記録しました",
+        "placeholders": {
+          "action": { "content": "$1" }
+        }
+    },
+    "record_to_review" :
+    {
+        "message" : "単語「$word$」を振り返り用に記録しました",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
+    },
+    "record_unrecognized" :
+    {
+        "message" : "「$word$」を誤認識された単語として記録しました",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
+    }
+}

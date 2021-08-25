@@ -1,0 +1,50 @@
+{
+    "text_you": {
+        "message": "You"
+    },
+    "alert_to_change_lanauge": {
+        "message": "add ?hl=en at the end of the URL. For example, https://meet.google.com/ccc-cccc-ccc?hl=en"
+    },
+    "alart_to_notify_no_pending_transcript": {
+        "message" : "No text in caption.<br> Press when immediate transcript is available."
+    },
+    "alart_to_notify_pending_transcript": {
+        "message" : "Please choose a word to record for study log, or press Esc to cancel logging.<br><br>"
+    },
+    "realtime_caption_to_send_to_log": {
+        "message" : "Choose a word to record as misrecognition<br><br>"
+    },
+    "realtime_no_caption_to_send_to_log": {
+        "message" : "No text in caption."
+    },
+    "realtime_caption_notify_the_option": {
+        "message" : "Unrecognized words recording option can be turned on via option settings"
+    },
+    "show_stats_option": {
+        "message" : "Statistics such as turn taking ratio can be turned on via option settings"
+    },
+    "show_option_feedback": {
+        "message" : "Feedback such as applause to use a designated phrase can be turned on Receive feedback via option settings"
+    },
+    "record_log" :
+    {
+        "message" : "You have chosen $action$ to record as log",
+        "placeholders": {
+          "action": { "content": "$1" }
+        }
+    },
+    "record_to_review" :
+    {
+        "message" : "Text $word$ recorded as a word to review",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
+    },
+    "record_unrecognized" :
+    {
+        "message" : "Text $word$ recorded as unrecognized word",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
+    }
+}

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head><title>My Test Extension Options</title></head>
+<body>
+<div><span>Server URL to record captions:</span>
+<span><input style="width:95%" type="text" id="speava_session_record"><br></span>
+</div>
+<div><span>Server URL to record for Google Spreadsheet:</span>
+<span><input style="width:95%"  type="text" id="speava_session_spreadsheet_post"><br></span>
+</div>
+<div><span>User name to record in caption record and to receive feedback for.</span>
+<span><input type="text" id="speava_session_username"></span>
+</div>
+<div><span>Options to record log when you have problems</span>
+<span><input style="width:95%"  type="text" id="speava_session_log_string"></span>
+</div>
+
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_send_raw"></span>
+<span>Send captions to analytics server</span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_post"></span>
+<span>Send captions to Spreadsheet</span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_show"></span>
+<span>Receive statistics (in the top left corner)</span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_notification_option"></span>
+<span>Receive feedback (in the center middle)</span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_unrecognized"></span>
+<span>Show unrecognized word option(in the top middle)</span>
+</div>
+
+
+<div id="status"></div>
+<button id="save">Save</button>
+
+<script src="options.js"></script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+{
+  "name": "Live Caption Analytics",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false,
+    "js": "options.js"
+  },
+  "description": "Provide routes to send live captions to analytics servers.",
+  "version": "1",
+  "icons": {
+    "128": "icons/icon.png"
+  },
+  "content_scripts": [{
+    "matches": ["https://meet.google.com/*"],
+    "js": ["inject.js"],
+    "css": ["css/style.css"],
+    "run_at": "document_idle",
+    "all_frames": false
+  }],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://meet.google.com/"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "options.js",
+        "options.html",
+        "icons/icon_config.png","icons/icon_delete.png","icons/icon_circle.png","icons/icon_record.png","icons/icon_log.png",
+        "css/style.css"],
+      "matches": [ "https://meet.google.com/*" ]
+    }
+  ],
+  "manifest_version": 3,
+  "default_locale": "en"
+}
