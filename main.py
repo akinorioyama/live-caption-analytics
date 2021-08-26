@@ -291,7 +291,7 @@ if __name__ == "__main__":
     create_db()
     # insert_db()
     # check_table()
-    if port == "443":
+    if port == 443:
         app.run(debug=False, host=host, port=int(port), ssl_context=('cert.pem','key.pem'))
     else:
         app.run(debug=False, host=host, port=int(port))
