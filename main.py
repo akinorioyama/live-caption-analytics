@@ -171,6 +171,7 @@ def return_stat_result():
     sum_df['dif'] = sum_df['dif'].apply(datetime.timedelta.total_seconds)
     sum_df.columns= ['name','duration']
     sum_df['share'] = sum_df['duration'] / sum_df['duration'].sum() * 100
+    sum_df['share'].fillna(0,inplace=True)
     sum_df['share'] = sum_df['share'].astype(int)
 
     last_clocktime = df['end'].max()
