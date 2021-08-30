@@ -37,7 +37,7 @@
     }
     #speava_textarea {
         color : #FFFFFF;
-        font-size : 48px;
+        /*font-size : 48px;*/
         position : absolute;
         width: 300px;
         z-index: 101;
