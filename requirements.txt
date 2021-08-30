@@ -1,3 +1,7 @@
 Flask-Cors
 flask
 pandas
+configparser
+nltk
+docopt
+requests

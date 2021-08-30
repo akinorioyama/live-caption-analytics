@@ -24,6 +24,17 @@ from docopt import docopt
 from flask import Flask, request, jsonify,json
 from flask_cors import CORS
 import pandas as pd
+from vocab_suggest import vocab_calculate_all
+from vocab_suggest import get_stats_for_levels_db
+from vocab_suggest import vocab_result_save
+from vocab_suggest import vocab_result_load
+from vocab_suggest import get_frequently_used_words
+from vocab_suggest import suggest_words
+from vocab_suggest import extract_words_from_response
+from vocab_suggest import remove_stopwords_entry
+
+DB_NAME = "test.db"
+
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
@@ -46,7 +57,7 @@ def receive_log():
     date_string = (datetime.datetime.fromisoformat(date_string_iso.split(".")[0]) + datetime.timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
     session_id  = data_json['transcriptId']
 
-    dbname = 'TEST.db'
+    dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     conn.execute("INSERT INTO log ( session , start , actor , text, logtype ) values ( " + \
                  "'" + session_id + "'," + \
@@ -94,7 +105,7 @@ def return_heartbeat():
     # print(df.columns)
     df.columns=['actor','text','start','end','session']
     # print("df in / after",df)
-    dbname = 'TEST.db'
+    dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     df_existing = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
     df_existing['start'] = pd.to_datetime(df_existing['start'],format="%Y-%m-%d %H:%M:%S")
@@ -109,8 +120,56 @@ def return_heartbeat():
                      "start = '" + datetime.datetime.strftime(row['start'],"%Y-%m-%d %H:%M:%S") + "' and " + \
                      "session = '" + row['session'] + "'")
     df_to_add.to_sql('caption',conn,if_exists='append',index=False)
+    # running caption part
+    if len(df_to_add) == 0:
+        conn.commit()
+        conn.close()
+        data = [{"name": "data received",
+                 "duration": 0}]
+        return jsonify(data)
+
+    df_existing_sub_from_df_to_add = df_to_add.copy()
+    df_existing_sub = pd.read_sql("SELECT * FROM caption_sub where session = '" + session_string + "'", conn)
+    df_existing_sub['start'] = pd.to_datetime(df_existing_sub['start'],format="%Y-%m-%d %H:%M:%S")
+    df_existing_sub['end'] = pd.to_datetime(df_existing_sub['end'],format="%Y-%m-%d %H:%M:%S")
+    # if new, insert the line
+    if len(df_existing_sub) == 0:
+        df_existing_sub_from_df_to_add['substart'] = df_existing_sub_from_df_to_add['start']
+        df_existing_sub_from_df_to_add.to_sql('caption_sub', conn, if_exists='append', index=False)
+
+    else:
+        df_existing_sub_new = df_existing_sub[-1:].copy()
+        df_existing_sub_new['substart'] = df_existing_sub_new['end'].values[0]
+        df_existing_sub_new['start'] = df_to_add['start'].values[0]
+        df_existing_sub_new['end'] = df_to_add['end'].values[0]
+        text_to_edit = df_to_add['text'].values[0]
+        text_to_edit = text_to_edit.replace(".","")
+        text_to_edit = text_to_edit.replace(",","")
+        text_to_edit = text_to_edit.replace("?","")
+        # text_to_edit = text_to_edit.replace(" ","") # preserve space to count words
+        text_to_edit = str.upper(text_to_edit)
+        text_to_remove = df_existing[-1:]['text'].values[0]
+        text_to_remove = text_to_remove.replace(".","")
+        text_to_remove = text_to_remove.replace(",","")
+        text_to_remove = text_to_remove.replace("?","")
+        # text_to_remove = text_to_remove.replace(" ","") # preserve space to count words
+
+        text_to_remove = str.upper(text_to_remove)
+        text_to_edit_new = text_to_edit.replace(text_to_remove,"",1)
+        import re
+        p = re.compile('[a-zA-Z]+')
+
+        if p.search(text_to_edit_new) is not None:
+            if len(text_to_edit_new) > 20:
+                print(text_to_edit)
+                print(text_to_remove)
+                print(text_to_edit_new)
+            df_existing_sub_new['text'] = text_to_edit_new
+            df_existing_sub_new.drop(['id'],axis=1, inplace=True)
+            df_existing_sub_new.to_sql('caption_sub',conn,if_exists='append',index=False)
     conn.commit()
     conn.close()
+
     data = [{"name": "data received",
              "duration": 0}]
     return jsonify(data)
@@ -120,25 +179,77 @@ def return_notification():
     data_received = request.get_data().decode('utf-8')
     data_json = json.loads(data_received)
     username = data_json['username']
+    session_string = data_json['transcriptId']
     print("username:",username)
 
     data = {"notification": {},
             "setting":{"duration": 2000}
             }
-    if (datetime.datetime.now().second % 15) < 5:
+    if (datetime.datetime.now().second % 15) <= 3:
         data = {"notification":{"name": "ヒント:",
                  "text": "他の表現も使ってみましょう"},
                 "setting":
                 {"duration": 2000}
                 }
-    elif (6 < (datetime.datetime.now().second % 15) < 10):
+    elif (3 < (datetime.datetime.now().second % 15) <= 6):
+        share_text = ""
+        df_freq_session = get_frequently_used_words(session=session_string)
+        df_freq_session = remove_stopwords_entry(df=df_freq_session)
+        df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] >= 1) & (df_freq_session['level'] >= "B1")]
+        if df_freq_session is not None:
+            for index, row in df_freq_session.iterrows():
+                share_text += row['vocab'] + ","
+        share_text += "が使えています"
         data = {"notification":{"name": "いいね！",
-                 "text": "<br>successive が使えましたね"},
+                 "text": share_text},
                 "setting":
-                {"duration": 5000}
+                {"duration": 2000}
+                }
+    elif (6 < (datetime.datetime.now().second % 15) <= 15):
+
+        df = vocab_calculate_all(session_string=session_string, db_type="past")
+        # df_sum = get_stats_for_levels_db(session_string=session_string)
+        vocab_result_save(df=df, db_target_name='vocab_aggregate')
+        df = vocab_result_load(session=session_string)
+        df_freq_session = get_frequently_used_words(session=session_string)
+        df_freq_session = remove_stopwords_entry(df=df_freq_session)
+        df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] >= 1) & (df_freq_session['level'] >= "B1")]
+        df = df[df['vocab'].isin(df_freq_session['vocab'])]
+        list_responses = suggest_words(target_level_equal_and_above="B1", df=df)
+        if len(list_responses) != 0:
+            list_suggestion_rel = extract_words_from_response(list_responses, "syn_list")
+            df_suggestion_rel = pd.DataFrame([[wp[0], wp[1], a, b, l] for wp, a, b, l in list_suggestion_rel],
+                                         columns=['vocab', 'pos', 'suggestion', 'definition', 'level'])
+        else:
+            df_suggestion_rel = None
+        share_text = '<br>'
+        share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;">'
+        share_text += f'<span style="width:64px;display:inline-block" class="head">word</span>' \
+                      f'<span style="width:128px;display:inline-block" class="head">suggestion</span>' \
+                      f'<span style="width:64px;display:inline-block" class="head">level</span>' \
+                      f'<span style="width:70%;display:inline-block" class="head">definition</span>' \
+                      f'</div>'
+
+        if df_suggestion_rel is not None:
+            df_suggestion_rel_top10 = df_suggestion_rel[0:5]
+            df_suggestion_rel_top10.sort_values(['level','vocab'],inplace=True, ascending=[False,True])
+            for index, row in df_suggestion_rel_top10.iterrows():
+                row['definition'][1] = str(row['definition'][1]).replace("{it}","<i>")
+                row['definition'][1] = str(row['definition'][1]).replace("{/it}","</i>")
+                share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;">'
+                share_text += f'<span style="width:64px;font-size:16px;display:inline-block;word-wrap: break-word;" class="item">{row["vocab"]}</span>' \
+                              f'<span style="width:128px;font-size:24px;display:inline-block;word-wrap: break-word;" class="item">{row["suggestion"]}</span>' \
+                              f'<span style="width:64px;font-size:16px;display:inline-block" class="item">{row["level"]}</span>' \
+                              f'<span style="width:70%;font-size:16px;display:inline-block" class="item">{row["definition"]}</span>'
+                share_text += '</div>'
+
+
+        data = {"notification":{"name": "使ってみて",
+                 "text": share_text },
+                "setting":
+                {"duration": 8000}
                 }
 
-    # print(data)
     return jsonify(data)
 
 @app.route('/show',methods=['POST','GET'])
@@ -153,60 +264,44 @@ def return_stat_result():
     session_string = data_json['transcriptId']
     username = data_json['username']
     print("username:",username)
-    dbname = 'TEST.db'
-    conn = sqlite3.connect(dbname)
-    df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
-    if len(df) == 0:
-        data = [{"name": f"no data exists for session {session_string}",
-                 "duration": 0}]
-        return jsonify( data)
-    df.columns = ['id','session','start','end','actor','text']
-    # print("df end",df['end'])
-    df['start'] = pd.to_datetime(df['start'],format="%Y-%m-%d %H:%M:%S")
-    df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S")
-    df['dif'] = df['end'] - df['start']
 
-    sum_df = df.groupby('actor').agg({'dif':'sum'})
-    sum_df =pd.DataFrame( sum_df.reset_index())
-    sum_df['dif'] = sum_df['dif'].apply(datetime.timedelta.total_seconds)
-    sum_df.columns= ['name','duration']
-    sum_df['share'] = sum_df['duration'] / sum_df['duration'].sum() * 100
-    sum_df['share'].fillna(0,inplace=True)
-    sum_df['share'] = sum_df['share'].astype(int)
+    if (datetime.datetime.now().second % 15) <= 3:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+        df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
+        if len(df) == 0:
+            data = [{"name": f"no data exists for session {session_string}",
+                     "duration": 0}]
+            return jsonify( data)
+        df.columns = ['id','session','start','end','actor','text']
+        # print("df end",df['end'])
+        df['start'] = pd.to_datetime(df['start'],format="%Y-%m-%d %H:%M:%S")
+        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S")
+        df['dif'] = df['end'] - df['start']
 
-    last_clocktime = df['end'].max()
-    last_clocktime = last_clocktime - datetime.timedelta(minutes=5)
-    df_5 = df[df['end'] > last_clocktime]
-    sum_df_5 = df_5.groupby('actor').agg({'dif':'sum'})
-    sum_df_5 =pd.DataFrame( sum_df_5.reset_index())
-    sum_df_5['dif'] = sum_df_5['dif'].apply(datetime.timedelta.total_seconds)
-    sum_df_5.columns= ['name','duration']
-    sum_df_5['share_5'] = sum_df_5['duration'] / sum_df_5['duration'].sum() * 100
-    sum_df_5['share_5'].fillna(0,inplace=True)
-    sum_df_5['share_5'] = sum_df_5['share_5'].astype(int)
-    sum_all = pd.merge(sum_df, sum_df_5, on='name',how="outer")
-    sum_all['share_5'].fillna(0,inplace=True)
-    sum_all['share'].fillna(0,inplace=True)
-    data = sum_all.to_json(orient="records")
+        sum_df = df.groupby('actor').agg({'dif':'sum'})
+        sum_df =pd.DataFrame( sum_df.reset_index())
+        sum_df['dif'] = sum_df['dif'].apply(datetime.timedelta.total_seconds)
+        sum_df.columns= ['name','duration']
+        sum_df['share'] = sum_df['duration'] / sum_df['duration'].sum() * 100
+        sum_df['share'].fillna(0,inplace=True)
+        sum_df['share'] = sum_df['share'].astype(int)
 
-    if (datetime.datetime.now().second % 10) < 3:
-        # data_json = json.loads(data)
-        # print("data_json length",len(data_json))
-        data_json = [{}]
-        data_json[0]['title'] = ''
-        data_json[0]['title'] += '<div><span class="text_head">vocab.</span></div>'
-        data_json[0]['title'] += '<div><span class="text_item">[X]Successive</span></div>'
-        data_json[0]['title'] += '<div><span class="text_item">[ ]Following</span></div>'
-        data_json[0]['title2'] = ''
-        data_json[0]['title2'] += '<div><span class="text_item">Activate those vocab.</span></div>'
-        # print("data_json:",data_json)
-        data = jsonify(data_json)
-        # print("data:",data)
-    elif 6 < (datetime.datetime.now().second % 10) < 7:
-        data = [{"name": "stat result",
-                 "duration": 10}]
-        data = jsonify(data)
-    else:
+        last_clocktime = df['end'].max()
+        last_clocktime = last_clocktime - datetime.timedelta(minutes=5)
+        df_5 = df[df['end'] > last_clocktime]
+        sum_df_5 = df_5.groupby('actor').agg({'dif':'sum'})
+        sum_df_5 =pd.DataFrame( sum_df_5.reset_index())
+        sum_df_5['dif'] = sum_df_5['dif'].apply(datetime.timedelta.total_seconds)
+        sum_df_5.columns= ['name','duration']
+        sum_df_5['share_5'] = sum_df_5['duration'] / sum_df_5['duration'].sum() * 100
+        sum_df_5['share_5'].fillna(0,inplace=True)
+        sum_df_5['share_5'] = sum_df_5['share_5'].astype(int)
+        sum_all = pd.merge(sum_df, sum_df_5, on='name',how="outer")
+        sum_all['share_5'].fillna(0,inplace=True)
+        sum_all['share'].fillna(0,inplace=True)
+        data = sum_all.to_json(orient="records")
+
         share_text = ''
         share_text += '<div style="font-size:24px;">'
         share_text += f'<span style="width:100px;" class="head">Speaker</span>' \
@@ -224,6 +319,98 @@ def return_stat_result():
                  "duration": "Turn taking"}]
         data = jsonify(data)
 
+    elif 3 < (datetime.datetime.now().second % 15) < 8:
+        # data = [{"name": "stat result",
+        #          "duration": 10}]
+        # data = jsonify(data)
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+        df = pd.read_sql("SELECT * FROM caption_sub where session = '" + session_string + "'", conn)
+        if len(df) == 0:
+            data = [{"name": f"no data exists for session {session_string}",
+                     "duration": 0}]
+            return jsonify( data)
+        df.columns = ['id','session','start','substart','end','actor','text']
+        df['substart'] = pd.to_datetime(df['substart'],format="%Y-%m-%d %H:%M:%S")
+        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S")
+        df['dif'] = df['end'] - df['substart']
+        df['word_count'] = df['text'].apply(str.split).apply(len)
+        df['wps'] = df['word_count'] / df['dif'].dt.seconds
+        df['wps'].fillna(0,inplace=True)
+        df.sort_values(['substart'],ascending=[False],inplace=True)
+
+        data = df.to_json(orient="records")
+
+        share_text = ''
+        share_text += '<div style="font-size:24px;">'
+        share_text += f'<span style="width:64px;font-size:12px;" class="head">clock</span>' \
+                      f'<span style="width:24px;font-size:12px;" class="head">sec</span>' \
+                      f'<span style="width:24px;font-size:12px;"  class="head">words</span>' \
+                      f'<span style="width:50px;font-size:12px;"  class="head">wps.</span>' \
+                      f'<span style="width:100px;font-size:12px;"  class="head">text</span>' \
+                      f'</div>'
+        for index, row in df[0:20:].iterrows():
+            share_text += '<div style="font-size:24px;">'
+            share_text += f'<span style="width:64px;font-size:12px;" class="item">{row["substart"].strftime("%M:%S")}</span>' \
+                          f'<span style="width:24px;font-size:12px;" class="item">{row["dif"].seconds}</span>' \
+                          f'<span style="width:24px;font-size:12px;" class="item">{row["word_count"]}</span>'
+            item_type = ""
+            item_fontsize = "12"
+            if row["wps"] < 0.4:
+                item_type = "item_red"
+                item_fontsize = "24"
+            else:
+                item_type = "item"
+            share_text += f'<span style="width:50px;font-size:{item_fontsize}px;" class="{item_type}">{format(row["wps"],".2f")}</span>'
+            share_text += f'<span style="width:100px;font-size:12px;" class="{item_type}">{str.lower(row["text"][0:26])}</span>'
+            share_text += '</div>'
+        # print(share_text)
+        data = [{"name": share_text,
+                 "duration": "Word per second"}]
+        data = jsonify(data)
+    elif 8 < (datetime.datetime.now().second % 15) < 12:
+        df = vocab_calculate_all(session_string=session_string, db_type="past")
+        df_sum = get_stats_for_levels_db(session_string=session_string)
+        vocab_result_save(df=df, db_target_name='vocab_aggregate')
+        df = vocab_result_load(session=session_string)
+        df_freq_session = get_frequently_used_words(session=session_string)
+        df_freq_session = remove_stopwords_entry(df=df_freq_session)
+        # df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] > 1) & (df_freq_session['level'] >= "B1")]
+        # count(vocab), vocab, start, session, level
+        df_freq_session.sort_values(['level','count(vocab)'],ascending=[False,True],inplace=True)
+        share_text = '<br>'
+        share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">'
+        share_text += f'<span style="width:120p;display:inline-block" class="head">word</span>' \
+                      f'<span style="width:82px;display:inline-block" class="head">level</span>' \
+                      f'<span style="width:24px;display:inline-block" class="head">frequency</span>' \
+                      f'</div>'
+
+        for index, row in df_freq_session[0:30].iterrows():
+            share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+            share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
+                          f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}</span>' \
+                          f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
+            share_text += '</div>'
+
+        share_text += "</div>"
+        data = [{"name": share_text,
+                 "duration": "Frequency"}]
+        data = jsonify(data)
+
+
+    else:
+        data_json = [{}]
+        data_json[0]['title'] = ''
+        data_json[0]['title'] += '<div><span class="text_head">vocab.</span></div>'
+        data_json[0]['title'] += '<div><span class="text_item">[X]Successive</span></div>'
+        data_json[0]['title'] += '<div><span class="text_item">[ ]Following</span></div>'
+        data_json[0]['title2'] = ''
+        data_json[0]['title2'] += '<div><span class="text_item">Activate those vocab.</span></div>'
+        # print("data_json:",data_json)
+        data = jsonify(data_json)
+        # print("data:",data)
+
+
     if data == "[]":
         data = [{"name": "stat result",
                  "duration": "No data:"}]
@@ -233,7 +420,7 @@ def return_stat_result():
 
 def check_table():
 
-    dbname = 'TEST.db'
+    dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     cur = conn.cursor()
 
@@ -245,7 +432,7 @@ def check_table():
 
 def insert_db():
 
-    dbname = 'TEST.db'
+    dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     cur = conn.cursor()
 
@@ -257,7 +444,7 @@ def insert_db():
 
 def create_db():
 
-    dbname = 'TEST.db'
+    dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     cur = conn.cursor()
 
@@ -269,9 +456,16 @@ def create_db():
         'end DATETIME, '
         'actor VARCHAR(30),'
         'text MESSAGE_TEXT )')
-
-    conn.commit()
-
+    cur.execute(
+        'CREATE TABLE IF NOT EXISTS caption_sub ('         
+        '	id INTEGER,'
+        '	session	VARCHAR(40),'
+        '	start DATETIME,'
+        '	substart DATETIME,'
+        '	end	DATETIME,'
+        '	actor VARCHAR(30),'
+        '	text MESSAGE_TEXT,'
+        '	PRIMARY KEY("id" AUTOINCREMENT) );')
     cur.execute(
         'CREATE TABLE IF NOT EXISTS log(id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'session VARCHAR(40),'
@@ -279,7 +473,7 @@ def create_db():
         'actor VARCHAR(30),'
         'text MESSAGE_TEXT,'
         'logtype MESSAGE_TEXT )')
-
+    conn.commit()
     conn.close()
 
 if __name__ == "__main__":
@@ -288,7 +482,6 @@ if __name__ == "__main__":
 
     host = arguments["<host>"]
     port = int(arguments["<port>"])
-
     create_db()
     # insert_db()
     # check_table()
