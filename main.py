@@ -32,12 +32,50 @@ from vocab_suggest import get_frequently_used_words
 from vocab_suggest import suggest_words
 from vocab_suggest import extract_words_from_response
 from vocab_suggest import remove_stopwords_entry
-
+from save_to_storage import get_caption_html
+from save_to_storage import get_delta
+from save_to_storage import get_blending_logs
 DB_NAME = "test.db"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
+
+@app.route('/caption',methods=['POST','GET'])
+def return_caption():
+    received_second = request.args.get('seconds')
+    received_session = request.args.get('session')
+    received_ip_address = request.remote_addr
+    if received_second is None:
+        text = get_caption_html(session=received_session, start=None)
+    else:
+        if received_second == "0":
+            df = get_delta(session=received_session, start=None)
+        else:
+            start_time = datetime.datetime.now() - datetime.timedelta(seconds=10, minutes=0)
+            df = get_delta(session=received_session, start=start_time)
+            if len(df) == 0:
+                print("reread with an extended time")
+                start_time = datetime.datetime.now() - datetime.timedelta(seconds=0, minutes=2)
+                df = get_delta(session=received_session, start=start_time)
+        df = get_blending_logs(session=received_session,start=None,df_caption=df)
+        text = df.to_json(orient="records")
+        # TODO: authorization mechanism has to be implemented
+        #  (although it could be already a little challenging to know the meeting id)
+        # if (received_ip_address in df['actor_ip'].values) == True:
+        #     text = df.to_json(orient="records")
+        # else:
+        #     data = [
+        #         {
+        #             'actor':'Not authorized',
+        #             'start': 'Not in',
+        #             'session': 'Not authorized session',
+        #             'text': 'Not authorized',
+        #         }
+        #     ]
+        #     text = jsonify(data)
+
+    return text
 
 @app.route('/log',methods=['POST','GET'])
 def receive_log():
@@ -54,7 +92,8 @@ def receive_log():
     input_text = data_json['text']
     logtype = data_json['logtype']
     date_string_iso = data_json['date']
-    date_string = (datetime.datetime.fromisoformat(date_string_iso.split(".")[0]) + datetime.timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+    # date_string = (datetime.datetime.fromisoformat(date_string_iso.split(".")[0]) + datetime.timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S")
+    date_string = (datetime.datetime.fromisoformat(str(date_string_iso).replace("Z","")) + datetime.timedelta(hours=9)).strftime("%Y-%m-%d %H:%M:%S.%f")
     session_id  = data_json['transcriptId']
 
     dbname = DB_NAME
@@ -79,7 +118,8 @@ def return_heartbeat():
     data = request.get_data().decode('utf-8')
     data_json = json.loads(data)
     username = data_json['username']
-    print("username:",username)
+    user_ip_address = request.remote_addr
+    print(f"username:{username}(at {user_ip_address})")
 
     if len(data_json['transcript']) == 0:
         data = [{"name": "no data exists",
@@ -92,10 +132,11 @@ def return_heartbeat():
     df = pd.DataFrame(data_json['transcript'])
     df.columns = ['dateStart','dateEnd',
                   'actor','text']
-    df['start'] = pd.to_datetime(df['dateStart'].str[:19]) + datetime.timedelta(hours=9)
-    df['end'] = pd.to_datetime(df['dateEnd'].str[:19]) + datetime.timedelta(hours=9)
+    df['start'] = pd.to_datetime(df['dateStart'].str.replace("Z","")) + datetime.timedelta(hours=9)
+    df['end'] = pd.to_datetime(df['dateEnd'].str.replace("Z","")) + datetime.timedelta(hours=9)
     df['dif'] = df['end'] - df['start']
     df['session'] = session_string
+    df['actor_ip'] = user_ip_address
     # print("df in /",df)
     # print(df.columns)
     df.drop(['dateStart','dateEnd','dif'],axis=1, inplace=True)
@@ -103,13 +144,13 @@ def return_heartbeat():
     #               'yearend', 'monthend', 'dayend', 'hourend', 'minend', 'secend','dif'
     #               ],axis=1,inplace=True)
     # print(df.columns)
-    df.columns=['actor','text','start','end','session']
+    df.columns=['actor','text','start','end','session','actor_ip']
     # print("df in / after",df)
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     df_existing = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
-    df_existing['start'] = pd.to_datetime(df_existing['start'],format="%Y-%m-%d %H:%M:%S")
-    df_existing['end'] = pd.to_datetime(df_existing['end'],format="%Y-%m-%d %H:%M:%S")
+    df_existing['start'] = pd.to_datetime(df_existing['start'],format="%Y-%m-%d %H:%M:%S.%f")
+    df_existing['end'] = pd.to_datetime(df_existing['end'],format="%Y-%m-%d %H:%M:%S.%f")
 
     df_to_add = df[-(df['start'].isin(df_existing['start']) & df['end'].isin(df_existing['end']) & df['actor'].isin(df_existing['actor']) & df['session'].isin(df_existing['session']))]
     # df_to_delete = df[(df['start'].isin(df_existing['start']) & df['actor'].isin(df_existing['actor']) & df['session'].isin(df_existing['session']))]
@@ -117,7 +158,7 @@ def return_heartbeat():
         # print("delete:",row['session'],row['actor'],row['start'])
         conn.execute("DELETE FROM caption where " + \
                      "actor = '" + row['actor'] + "' and " + \
-                     "start = '" + datetime.datetime.strftime(row['start'],"%Y-%m-%d %H:%M:%S") + "' and " + \
+                     "start = '" + datetime.datetime.strftime(row['start'],"%Y-%m-%d %H:%M:%S.%f") + "' and " + \
                      "session = '" + row['session'] + "'")
     df_to_add.to_sql('caption',conn,if_exists='append',index=False)
     # running caption part
@@ -130,8 +171,8 @@ def return_heartbeat():
 
     df_existing_sub_from_df_to_add = df_to_add.copy()
     df_existing_sub = pd.read_sql("SELECT * FROM caption_sub where session = '" + session_string + "'", conn)
-    df_existing_sub['start'] = pd.to_datetime(df_existing_sub['start'],format="%Y-%m-%d %H:%M:%S")
-    df_existing_sub['end'] = pd.to_datetime(df_existing_sub['end'],format="%Y-%m-%d %H:%M:%S")
+    df_existing_sub['start'] = pd.to_datetime(df_existing_sub['start'],format="%Y-%m-%d %H:%M:%S.%f")
+    df_existing_sub['end'] = pd.to_datetime(df_existing_sub['end'],format="%Y-%m-%d %H:%M:%S.%f")
     # if new, insert the line
     if len(df_existing_sub) == 0:
         df_existing_sub_from_df_to_add['substart'] = df_existing_sub_from_df_to_add['start']
@@ -166,6 +207,7 @@ def return_heartbeat():
                 print(text_to_edit_new)
             df_existing_sub_new['text'] = text_to_edit_new
             df_existing_sub_new.drop(['id'],axis=1, inplace=True)
+            df_existing_sub_new['actor'] = username
             df_existing_sub_new.to_sql('caption_sub',conn,if_exists='append',index=False)
     conn.commit()
     conn.close()
@@ -273,10 +315,10 @@ def return_stat_result():
             data = [{"name": f"no data exists for session {session_string}",
                      "duration": 0}]
             return jsonify( data)
-        df.columns = ['id','session','start','end','actor','text']
+        df.columns = ['id','session','start','end','actor','text','actor_ip']
         # print("df end",df['end'])
-        df['start'] = pd.to_datetime(df['start'],format="%Y-%m-%d %H:%M:%S")
-        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S")
+        df['start'] = pd.to_datetime(df['start'],format="%Y-%m-%d %H:%M:%S.%f")
+        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S.%f")
         df['dif'] = df['end'] - df['start']
 
         sum_df = df.groupby('actor').agg({'dif':'sum'})
@@ -331,8 +373,8 @@ def return_stat_result():
                      "duration": 0}]
             return jsonify( data)
         df.columns = ['id','session','start','substart','end','actor','text']
-        df['substart'] = pd.to_datetime(df['substart'],format="%Y-%m-%d %H:%M:%S")
-        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S")
+        df['substart'] = pd.to_datetime(df['substart'],format="%Y-%m-%d %H:%M:%S.%f")
+        df['end'] = pd.to_datetime(df['end'],format="%Y-%m-%d %H:%M:%S.%f")
         df['dif'] = df['end'] - df['substart']
         df['word_count'] = df['text'].apply(str.split).apply(len)
         df['wps'] = df['word_count'] / df['dif'].dt.seconds
@@ -452,24 +494,25 @@ def create_db():
     cur.execute(
         'CREATE TABLE IF NOT EXISTS caption(id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'session VARCHAR(40),'
-        'start DATETIME,'
-        'end DATETIME, '
+        'start DATETIME(6),'
+        'end DATETIME(6), '
         'actor VARCHAR(30),'
-        'text MESSAGE_TEXT )')
+        'text MESSAGE_TEXT,'
+        'actor_ip VARCHAR(60) )')
     cur.execute(
         'CREATE TABLE IF NOT EXISTS caption_sub ('         
         '	id INTEGER,'
         '	session	VARCHAR(40),'
-        '	start DATETIME,'
-        '	substart DATETIME,'
-        '	end	DATETIME,'
+        '	start DATETIME(6),'
+        '	substart DATETIME(6),'
+        '	end	DATETIME(6),'
         '	actor VARCHAR(30),'
         '	text MESSAGE_TEXT,'
         '	PRIMARY KEY("id" AUTOINCREMENT) );')
     cur.execute(
         'CREATE TABLE IF NOT EXISTS log(id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'session VARCHAR(40),'
-        'start DATETIME,'
+        'start DATETIME(6),'
         'actor VARCHAR(30),'
         'text MESSAGE_TEXT,'
         'logtype MESSAGE_TEXT )')

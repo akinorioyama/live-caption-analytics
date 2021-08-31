@@ -9,7 +9,7 @@ The <b>chrome extension</b> will post the data to two of your servers to analyze
 
 ***1) chrome extension*** part captures live caption and send (request) the portion to servers configured in option settings for the extension, and then receive (response) and render the response from the server. The extension is publicly available from [here](https://chrome.google.com/webstore/detail/pppkdkcchlonlocoiejjinmkdncfblji).
 
-***2) analysis*** receives the caption data from the extension and will perform due calculations to return the response to the sender. The extension users can configure three options and can interact with the UI to control the POST requests to the endpoints, which are `/`, `/log`, `/show` and `/notification`.
+***2) analysis*** receives the caption data from the extension and will perform due calculations to return the response to the sender. The extension users can configure three options and can interact with the UI to control the POST requests to the endpoints, which are `/`, `/log`, `/show`, `/notification` and `/caption`.
 
 ***3) record*** sends the current caption line to a POST endpoint. The endpoint can be a Google spreadsheet as in the sample `receive_data.gs` in the folder `peripheral_functions/Google spreadsheet`. The POST enabled spreadsheet will update the received data to the dedicated sheet.
 
@@ -20,6 +20,7 @@ main.py          <---2) analysis - sample implementation
 receive_data.gs  <-- 3) record - snippet to publish and will listen to POST calls
 vocab_suggest.py <---4) analysis - sample implementation for vocabulary profile
                                    and for vocabulary suggestion
+save_to_storage.py <---5) analysis - sample implementation for retriving stored caption
 ```
 **Installation**
 ---
@@ -44,6 +45,8 @@ Aside from the ***chrome extensions*** and key functions in ***analysis*** and *
 ***3) fluency*** shows how fluent you are in a-few-seconds segments. One to a few seconds chunk will be shown in each line.
 
 ***4) turn taking*** shows how much each speaker speaks among others.
+
+***5) caption retrieval*** shows lines of captions interlaced with highlighted points through `/log` POST requests.
 
 **(In pipeline)**
 
