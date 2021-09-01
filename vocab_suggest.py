@@ -42,7 +42,7 @@ def create_db(db_file_name):
         'CREATE TABLE IF NOT EXISTS vocab_aggregate ( '
         'id INTEGER PRIMARY KEY AUTOINCREMENT, '
         'session	VARCHAR(40),'
-        'start	DATETIME,'
+        'start	DATETIME(6),'
         'vocab	VARCHAR(30),'
         'category	VARCHAR(10),'
         'level	VARCHAR(10),'
@@ -189,13 +189,65 @@ def get_stats_for_levels_db(session_string = ""):
 
 def extract_words_from_response(list_responses = None,list_type="syn_list"):
     # list_type: ['rel_list', 'syn_list', 'sn', 'sim_list']
-    extracted_list = [[[[line['hwi']['hw'], line['fl'], line['def'][0]['sseq'][0][0][1]] for line in json.loads(list_response) if
-      keyword in line['def'][0]['sseq'][0][0][1]] for keyword in [list_type]] for list_response in list_responses]
-    target_list =[item[0][0][2][list_type][0][0]['wd'] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1]  # item[0] to avoid blank lines
-    dt_list =[item[0][0][2]['dt'] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1]                       # item[0] to avoid blank lines
-    word_and_pos_list = [[item[0][0][0], item[0][0][1]] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1] # item[0] to avoid blank lines
-    level_list = [dict_cefr_level[item[0][0][0]] if item[0][0][0] in dict_cefr_level else 'NA' for item in extracted_list if len(item[0]) >= 1]  # item[0] to avoid blank lines
+    word_and_pos_list = []
+    target_list  = []
+    dt_list = []
+    level_list = []
+    for list_response in list_responses:
+        response = json.loads(list_response)
+        for entry_in_response in response:
+            if ('meta' in entry_in_response) == False:
+                continue
+            id = entry_in_response['meta']['id']
+            if ('hwi' in entry_in_response) == False:
+                continue
+            hwi_hw = entry_in_response['hwi']['hw']
+            if ('fl' in entry_in_response) == False:
+                continue
+            fl = entry_in_response['fl']
+            # syns/ants/offensive
+            for entry_in_sseq in entry_in_response['def'][0]['sseq']:
+                if (list_type in entry_in_sseq[0][1]) == False:
+                    continue
+                if ('dt' in entry_in_sseq[0][1]) == True:
+                    dt_item = entry_in_sseq[0][1]['dt']
+                for list_type_entry in entry_in_sseq[0][1][list_type]:
+                    for wd_in_entry in list_type_entry:
+                        if 'wd' in wd_in_entry:
+                            wd_item = wd_in_entry['wd']
+                            if wd_item in dict_cefr_level:
+                                level = dict_cefr_level[wd_item]
+                            else:
+                                level = "NA"
+                            word_and_pos_list.append([id,fl])
+                            target_list.append(wd_item)
+                            dt_list.append(dt_item)
+                            level_list.append(level)
+                        else:
+                            print(wd_in_entry)
     return_list = zip(word_and_pos_list,target_list,dt_list,level_list)
+    #
+    # pre_extract_list = [[[line] for line in json.loads(list_response) if ('meta' in line) for keyword in [list_type]] for list_response in
+    #  list_responses if
+    #  len([[line] for line in json.loads(list_response) if ('meta' in line) for keyword in [list_type]]) != 0]
+    # pre_extract_list = [[[line] for line in json.loads(list_response) if ('meta' in line) for keyword in [list_type]] for list_response in
+    #  list_responses if
+    #  len([[line] for line in json.loads(list_response) if ('meta' in line) for keyword in [list_type]]) != 0].copy()
+    # import itertools
+    # flatten_extract_list = list(itertools.chain.from_iterable([[line for line in list_response] for list_response in pre_extract_list]))
+    # # [x for line in flatten_extract_list for x in line for y in x]
+    # # [entry for line in pre_extract_list for entry in line]
+    # extracted_list = [[[[line['hwi']['hw'], line['fl'], line['def'][0]['sseq'][0][0][1]] for line in list_response if
+    #   keyword in line['def'][0]['sseq'][0][0][1]] for keyword in [list_type]] for list_response in pre_extract_list]
+    # # [[list_response[0]['hwi']['hw'], list_response[0]['def'], list_response[0]['def'][0]['sseq']] for list_response in
+    # #  flatten_extract_list if ('hwi' in list_response[0].keys())]
+    # # extracted_list = [[[[line['hwi']['hw'], line['fl'], line['def'][0]['sseq'][0][0][1]] for line in json.loads(list_response) if
+    # #   keyword in line['def'][0]['sseq'][0][0][1]] for keyword in [list_type]] for list_response in list_responses]
+    # target_list =[item[0][0][2][list_type][0][0]['wd'] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1]  # item[0] to avoid blank lines
+    # dt_list =[item[0][0][2]['dt'] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1]                       # item[0] to avoid blank lines
+    # word_and_pos_list = [[item[0][0][0], item[0][0][1]] for item in [ext_list for ext_list in extracted_list] if len(item[0]) >= 1] # item[0] to avoid blank lines
+    # level_list = [dict_cefr_level[item[0][0][0]] if item[0][0][0] in dict_cefr_level else 'NA' for item in extracted_list if len(item[0]) >= 1]  # item[0] to avoid blank lines
+    # return_list = zip(word_and_pos_list,target_list,dt_list,level_list)
     return return_list
 
 def suggest_words(target_level_equal_and_above = "C2",df = None, df_target_language = None):

@@ -19,6 +19,8 @@ Options:
 
 import datetime
 import sqlite3
+
+import numpy as np
 from docopt import docopt
 
 from flask import Flask, request, jsonify,json
@@ -176,6 +178,7 @@ def return_heartbeat():
     # if new, insert the line
     if len(df_existing_sub) == 0:
         df_existing_sub_from_df_to_add['substart'] = df_existing_sub_from_df_to_add['start']
+        df_existing_sub_from_df_to_add.drop(['actor_ip'], axis=1, inplace=True)
         df_existing_sub_from_df_to_add.to_sql('caption_sub', conn, if_exists='append', index=False)
 
     else:
@@ -356,6 +359,20 @@ def return_stat_result():
                           f'<span style="width:100px;" class="item">{row["share"]}%</span>' \
                           f'<span style="width:100px;" class="item">{row["share_5"]}%</span>'
             share_text += '</div>'
+        # single speaker speaking time
+        # length = df[-1:]['dif'].values[0].view('<i8')/10**9
+        speaker = df[-1:]['actor'].values[0]
+        last_row_of_a_different_speaker = df[df['actor'] != speaker].index.max()
+        if last_row_of_a_different_speaker is np.nan:
+            # all lines are for the single speaker
+            length = df['dif'].sum().view('<i8') / 10 ** 9
+        else:
+            length = df[last_row_of_a_different_speaker+1:]['dif'].sum().view('<i8') / 10 ** 9
+        share_text += '<div style="font-size:24px;">Single speaker speaking time</div>'
+        share_text += '<br><br>'
+        share_text += '<div style="font-size:24px;">'
+        share_text += f'Speaker:{speaker} for {length}'
+        share_text += '</div>'
         # print(share_text)
         data = [{"name": share_text,
                  "duration": "Turn taking"}]
@@ -392,7 +409,7 @@ def return_stat_result():
                       f'<span style="width:100px;font-size:12px;"  class="head">text</span>' \
                       f'</div>'
         for index, row in df[0:20:].iterrows():
-            share_text += '<div style="font-size:24px;">'
+            share_text += '<div style="font-size:12px;">'
             share_text += f'<span style="width:64px;font-size:12px;" class="item">{row["substart"].strftime("%M:%S")}</span>' \
                           f'<span style="width:24px;font-size:12px;" class="item">{row["dif"].seconds}</span>' \
                           f'<span style="width:24px;font-size:12px;" class="item">{row["word_count"]}</span>'
