@@ -1,15 +1,12 @@
     #speava_session_notification {
         color: #FFFFFF !important;
-        font-size: 48px !important;
         margin-top: 10px !important;
         z-index: 102 !important;
     }
 
     #speava_session_notification.display_dialog {
-        /*display: flex  !important;*/
         visibility: visible !important;
         color: #FFFFFF !important;
-        font-size: 48px !important;
         margin-top: 10px !important;
     }
 
@@ -24,25 +21,24 @@
     }
 
     #speava_caption_reaction {
-        /*display: flex !important;*/
         color: rgba(255, 255, 255, 0.5) !important;
         font-size: 24px !important;
-        /*position: relative;*/
-        /*position : absolute !important;*/
-        /*left : 300px !important;*/
-        /*top : 144px !important;*/
-        /*size : 150px !important;*/
         z-index: 120 !important;
         tab-index: 3;
     }
+    #speava_caption_reaction.display_none{
+        visibility: hidden !important;
+    }
+
     #speava_textarea {
         color : #FFFFFF;
-        /*font-size : 48px;*/
         position : absolute;
         width: 300px;
         z-index: 101;
     }
-
+    #speava_textarea.display_none{
+        visibility: hidden !important;
+    }
     #speava_textarea.option_notification {
         color: rgba(255, 255, 255, 0.5) !important;
         font-size: 12px  !important;
@@ -50,7 +46,6 @@
 
     #speava_textarea > div {
         font-size : 12px;
-        /*line-height: 12px;*/
     }
 
     #speava_textarea > div .item {

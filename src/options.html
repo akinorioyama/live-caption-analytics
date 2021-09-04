@@ -17,26 +17,27 @@
 
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_send_raw"></span>
-<span>Send captions to analytics server</span>
+    <span><label for="speava_session_send_raw">Send captions to analytics server</label></span>
 </div>
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_post"></span>
-<span>Send captions to Spreadsheet</span>
+<span><label for="speava_session_post" > Send captions to Spreadsheet</label></span>
 </div>
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_show"></span>
-<span>Receive statistics (in the top left corner)</span>
+<span><label for="speava_session_show">Receive statistics (in the top left corner)</label></span>
 </div>
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_notification_option"></span>
-<span>Receive feedback (in the center middle)</span>
+<span><label for="speava_session_notification_option">Receive feedback (in the center middle)</label></span>
 </div>
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_unrecognized"></span>
-<span>Show unrecognized word option(in the top middle)</span>
+<span><label for="speava_session_unrecognized">Show unrecognized word option(in the top middle)</label></span>
 </div>
-
-
+<div><span>Arbitrary option settings<br></span>
+<span><textarea id="speava_session_option_string" rows="5" cols="40"></textarea></span>
+</div>
 <div id="status"></div>
 <button id="save">Save</button>
 

@@ -108,7 +108,7 @@ try {
   let speava_session_show;
   let speava_session_notification;
   let speava_session_unrecognized;
-
+  let speava_session_option_string;
 
   // changed keys from __gmt to __gmla to avoid collision
   // hangouts -> meet_sessions
@@ -261,6 +261,46 @@ try {
   // -------------------------------------------------------------------------
   // sync settings from localStorage
   // -------------------------------------------------------------------------
+  const getAllStorageSyncData = () => {
+    // Immediately return a promise and start asynchronous work
+    return new Promise((resolve) => {
+      // Asynchronously fetch all data from storage.sync.
+      chrome.storage.sync.get({
+      speava_session_record: 'enter URL',
+      speava_session_spreadsheet_post: 'enter URL',
+      speava_session_username: 'Default user',
+      speava_session_log_string: 'Wonder,Mistakes',
+      speava_session_send_raw: false,
+      speava_session_post: false,
+      speava_session_show: false,
+      speava_session_notification: false,
+      speava_session_unrecognized: false,
+      speava_session_option_string: null
+    }, (items) => {
+        // resolve(is_synced = true);
+        is_synced = true
+        // Pass any observed errors down the promise chain.
+        if (chrome.runtime.lastError) {
+          return reject(chrome.runtime.lastError);
+        }
+        // Pass the data retrieved from storage down the promise chain.
+        speava_server_url_to_record = items.speava_session_record;
+        speava_server_url_to_post = items.speava_session_spreadsheet_post;
+        speava_server_username = items.speava_session_username;
+        speava_session_log_string = items.speava_session_log_string;
+        speava_session_send_raw =             items.speava_session_send_raw
+        speava_session_post =                 items.speava_session_post
+        speava_session_show =                 items.speava_session_show
+        speava_session_notification =         items.speava_session_notification
+        speava_session_unrecognized =         items.speava_session_unrecognized
+        speava_session_option_string =        items.speava_session_option_string
+
+        let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
+        SPEAKER_NAME_MAP = obj;
+
+      });
+    });
+  }
   const syncSettings = () => {
   // -------------------------------------------------------------------------
   // sync settings from storage.sync
@@ -490,17 +530,26 @@ try {
       set(KEY_TRANSCRIPT_IDS, [...transcriptIds.slice(0, index), ...transcriptIds.slice(index + 1)]);
     }
 
-    const transcriptNode = document.querySelector(`#${transcriptId}`);
-    if (transcriptNode) {
-      const parentNode = transcriptNode.parentNode;
-      parentNode.removeChild(transcriptNode);
+    // query selector may run where screen is not in conf mode. Handle DOMException
 
-      if (parentNode.children.length === 0) {
-        parentNode.parentNode.removeChild(parentNode.previousSibling);
-        parentNode.parentNode.removeChild(parentNode);
+    try {
+      const transcriptNode = document.querySelector(`#${transcriptId}`);
+      if (transcriptNode) {
+        const parentNode = transcriptNode.parentNode;
+        parentNode.removeChild(transcriptNode);
+
+        if (parentNode.children.length === 0) {
+          parentNode.parentNode.removeChild(parentNode.previousSibling);
+          parentNode.parentNode.removeChild(parentNode);
+        }
+      } else {
+        debug(`transcriptNode doesn't exist for ${transcriptId}`);
       }
-    } else {
-      debug(`transcriptNode doesn't exist for ${transcriptId}`);
+    } catch (e) {
+      if (e instanceof DOMError) {
+        console.log("DOMError: potential removal in a screen where transcriptId is NOT present");
+      }
+      console.log(e);
     }
   }
 
@@ -918,18 +967,19 @@ try {
             if (isTextAreaCreated !== null) {
                 const feedback_textarea = xpath(`//div[@id="speava_textarea"]`, document);
                 let text_for_stat = "";
-                for (let item of json_text) {
-                  for (let sub_item in item) {
-                    text_for_stat += item[sub_item] + "\t";
-                  }
-                  text_for_stat += "\n";
+                text_for_stat += json_text.heading;
+                for (let item in json_text.notification) {
+                    text_for_stat += json_text.notification[item] + "\t";
                 }
                 feedback_textarea.innerHTML = text_for_stat;
-                feedback_textarea.classList.remove("option_notification");
+                time_length = json_text.setting.duration;
+                // feedback_textarea.classList.remove("option_notification");
+                setTimeout(function() {
+                    speava_async_response_show = null;
+                },time_length);
             }
-
         });
-        speava_async_response_show = null;
+        // speava_async_response_show = null;
     };
 
 
@@ -1005,7 +1055,7 @@ try {
 //               return chosen_text;
 //     }
               for (let item_text of item_texts) {
-                inner_text += `<div id="hinttext${counter}" style="display:inline; font-size:48px;">${item_text} </div>`
+                inner_text += `<div id="hinttext${counter}" style="display:inline; font-size:48px;" data-starttime="${item[0]}">${item_text} </div>`
                 counter += 1;
               }
             }
@@ -1031,7 +1081,7 @@ try {
                     message_text +
                     '</div>',1500);
 
-                fire_log(e.target.innerText,"unknown_word_to_review");
+                fire_log(e.target.innerText,"unknown_word_to_review",e.target.dataset.starttime);
                 document.querySelector('dialog').remove();
               });
             }
@@ -1044,17 +1094,18 @@ try {
     // fire a URL call to record the highlight ->alternatively fired in recordingPrompt through click eventHandler
                                  } ;
 
-  const fire_log = (input_text,logtype) => {
+  const fire_log = (input_text,logtype, logtime=null) => {
     try {
       const now = new Date();
       const dateString = now.toISOString();
-
       let obj = {
         text: input_text,
         logtype: logtype,
+        logtime: logtime,
         date: dateString,
         transcriptId: currentTranscriptId,
-        username: speava_server_username
+        username: speava_server_username,
+        option_settings: speava_session_option_string
       }
       speava_async_response_log = fetch(speava_server_url_to_record + "/log",
           {
@@ -1091,12 +1142,13 @@ try {
             var speava_session_record = document.getElementById('speava_session_record').value;
             var speava_session_spreadsheet_post = document.getElementById('speava_session_spreadsheet_post').value;
             var speava_session_username = document.getElementById('speava_session_username').value;
-            var speava_session_log_string = document.getElementById('speava_session_log_string').value;
+            speava_session_log_string = document.getElementById('speava_session_log_string').value;
             speava_session_send_raw = document.getElementById('speava_session_send_raw').checked;
             speava_session_post = document.getElementById('speava_session_post').checked;
             speava_session_show = document.getElementById('speava_session_show').checked;
             speava_session_notification = document.getElementById('speava_session_notification_option').checked;
             speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
+            speava_session_option_string = document.getElementById('speava_session_option_string').value;
 
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
@@ -1112,9 +1164,15 @@ try {
               speava_session_post : speava_session_post,
               speava_session_show : speava_session_show,
               speava_session_notification : speava_session_notification,
-              speava_session_unrecognized : speava_session_unrecognized
+              speava_session_unrecognized : speava_session_unrecognized,
+              speava_session_option_string: speava_session_option_string
             }, function() {
               // Update status to let user know options were saved.
+              let optional_buttons = document.getElementById('optional_buttons');
+              while (optional_buttons.firstChild){
+                optional_buttons.removeChild(optional_buttons.firstChild);
+              }
+              add_option_buttons(optional_buttons);
               var status = document.getElementById('status');
               status.textContent = 'Options saved.';
               setTimeout(function() {
@@ -1134,7 +1192,8 @@ try {
               speava_session_post: false,
               speava_session_show: false,
               speava_session_notification: false,
-              speava_session_unrecognized: false
+              speava_session_unrecognized: false,
+              speava_session_option_string: null
             }, function(items) {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -1145,6 +1204,7 @@ try {
               document.getElementById('speava_session_show').checked = items.speava_session_show;
               document.getElementById('speava_session_notification_option').checked = items.speava_session_notification;
               document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
+              document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
             });
           }
           document.body.appendChild(dialog);
@@ -1174,7 +1234,8 @@ try {
       try {
         let obj = {
           transcriptId: currentTranscriptId,
-          username: speava_server_username
+          username: speava_server_username,
+          option_settings: speava_session_option_string
         }
         url = speava_server_url_to_record + "/notification"
         speava_async_response_notification = fetch(url,
@@ -1224,7 +1285,7 @@ try {
           item_texts = item[3];
           item_texts = item_texts.split(" ");
           for (let item_text of item_texts) {
-            inner_text += `<div id="hinttext_caption_reaction${counter}" style="display:inline; font-size:48px;">${item_text} </div>`
+            inner_text += `<div id="hinttext_caption_reaction${counter}" style="display:inline; font-size:16px;" data-starttime="${item[0]}">${item_text} </div>`
             counter += 1;
           }
         }
@@ -1242,38 +1303,34 @@ try {
             toast_to_notify('<div style="font-size:24px;">' +
                 message_text +
                 '</div>', 1500);
-            fire_log(e.target.innerText, "mistakenlyRecognized");
+            fire_log(e.target.innerText,  "mistakenlyRecognized",e.target.dataset.starttime);
 
           });
         }
       }
 
-      let notification_area = document.getElementById("speava_session_notification");
       if (!speava_session_notification) {
+        let notification_area = document.getElementById("speava_session_notification");
         notification_area.innerHTML = chrome.i18n.getMessage("show_option_feedback");
-        notification_area.classList.add('option_notification');
-      } else {
-        notification_area.classList.remove('option_notification');
       }
-
       if (!speava_session_show){
         const feedback_textarea = document.getElementById("speava_textarea");
         feedback_textarea.innerHTML = chrome.i18n.getMessage("show_stats_option");
-        feedback_textarea.classList.add("option_notification");
-
       } else {
         if (speava_async_response_show === null || speava_async_response_show === undefined) {
           if (isShowing === true) {
             try {
               let obj = {
                 transcriptId: currentTranscriptId,
-                username: speava_server_username
+                username: speava_server_username,
+                option_settings: speava_session_option_string
               }
               speava_async_response_show = fetch(speava_server_url_to_record + "/show",
                   {
                     method: "POST",
                     mode: "cors",
-                    body: JSON.stringify(obj)
+                    body: JSON.stringify(obj),
+                    cache: "no-cache"
                   });
               speava_async_response_show.then(processReceivedReplyShow).catch(error => {
                 //console.log("int catch",error);
@@ -1302,7 +1359,8 @@ try {
             let obj = {
               transcript: transcript_text,
               transcriptId: currentTranscriptId,
-              username: speava_server_username
+              username: speava_server_username,
+              option_settings: speava_session_option_string
             }
             speava_async_response = fetch(speava_server_url_to_record,
                 {
@@ -1330,7 +1388,8 @@ try {
         let obj_last_only = {
           transcript: [transcript_text[transcript_text.length - 1]],
           transcriptId: currentTranscriptId,
-          username: speava_server_username
+          username: speava_server_username,
+          option_settings: speava_session_option_string
         }
 
 
@@ -1346,25 +1405,16 @@ try {
   }
 
   // -------------------------------------------------------------------------
-  // Add transcript button to DOM if not present repeatedly and forever
+  // Add buttons
   //
-  // Continually attempt to add the transcript button if hasn't been added
-  // yet. This needs to be re-run because people can join/leave meetings
-  // without reloading the page.
+  // Always show buttons so that users can change configuration
+  //   and clear transcripts that, otherwise, sometimes prevent users from
+  //   removing past captions due to unrecognized text pane
   // -------------------------------------------------------------------------
-  const addButtonLoop = () => {
-    // window.alert(chrome.i18n.getMessage("text_you"));
-    // Browser setting will not be used as Google Meet display language
-    // if (language_setting_browser !== "en") {
-    //   window.alert("Switch your browser language to en. Otherwise, this extension will not work.");
-    // }
-
-    const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
-    if ( pathString === null || pathString[2] !== "en"){
-      const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
-      window.alert(msg_string);
+  const addButtons = () => {
+    if (is_synced === null){
+      return;
     }
-
     if (isTextAreaCreated === null) {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
@@ -1391,15 +1441,6 @@ try {
 
       isTextAreaCreated = true;
 
-    }
-
-
-    if (buttons === null){
-
-      const captionsButtons = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
-      if (!captionsButtons){
-        return;
-      }
       const objBody_buttons = document.getElementsByTagName("body").item(0);
       buttons = document.createElement('div');
       isShowing = true;
@@ -1479,7 +1520,21 @@ try {
       buttons.prepend(log_record_type_Button);
       log_record_type_Button.style.display = "inline-flex";
       log_record_type_Button.style.flexDirection = "column";
+      log_record_type_Button.id = "optional_buttons"
 
+      add_option_buttons(log_record_type_Button);
+
+      log_record_type_Button.style.display = 'flex';
+      log_record_type_Button.style.position = 'relative';
+      log_record_type_Button.style.zIndex = 104;
+      log_record_type_Button.style.float = 'left';
+
+
+    }
+
+  };
+
+  const add_option_buttons = (log_record_type_Button) => {
       const log_options = speava_session_log_string.split(",");
       let option_counter = 0;
       for (let item of log_options) {
@@ -1487,6 +1542,8 @@ try {
         log_record_type_obj.setAttribute('id',`button_record_type_${option_counter}`)
         // log_record_type_obj.style.display = "block";
         log_record_type_obj.innerText = item;
+        log_record_type_obj.style.borderRadius = "10px";
+        log_record_type_obj.style.lineHeight = "2.5";
         log_record_type_obj.addEventListener('click', e => {
           const clicked_button_text = e.target.innerText;
           // window.alert("You have chosen (button):\n" + clicked_button_text);
@@ -1500,11 +1557,49 @@ try {
         option_counter += 1;
       }
 
-      log_record_type_Button.style.display = 'flex';
-      log_record_type_Button.style.position = 'relative';
-      log_record_type_Button.style.zIndex = 104;
-      log_record_type_Button.style.float = 'left';
+  }
+  // -------------------------------------------------------------------------
+  // Add transcript button to DOM if not present repeatedly and forever
+  //
+  // Continually attempt to add the transcript button if hasn't been added
+  // yet. This needs to be re-run because people can join/leave meetings
+  // without reloading the page.
+  // -------------------------------------------------------------------------
+  const addButtonLoop = () => {
+    // window.alert(chrome.i18n.getMessage("text_you"));
+    // Browser setting will not be used as Google Meet display language
+    // if (language_setting_browser !== "en") {
+    //   window.alert("Switch your browser language to en. Otherwise, this extension will not work.");
+    // }
+
+    const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
+    if ( pathString === null || pathString[2] !== "en"){
+      const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
+      window.alert(msg_string);
     }
+
+    // hide panes if the user is not in a meeting.
+    const captionsButtonAvailability = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
+    const notification_area = document.getElementById("speava_session_notification");
+    const feedback_textarea = document.getElementById("speava_textarea");
+    const element_caption_reaction = document.getElementById("speava_caption_reaction");
+    if (captionsButtonAvailability){
+      notification_area.classList.remove('display_none');
+      feedback_textarea.classList.remove('display_none');
+      element_caption_reaction.classList.remove('display_none');
+    } else {
+      notification_area.classList.add('display_none');
+      feedback_textarea.classList.add('display_none');
+      element_caption_reaction.classList.add('display_none');
+    }
+    if (buttons === null){
+
+      const captionsButtons = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
+      if (!captionsButtons){
+        return;
+      }
+    }
+
   };
 
   const makePng = ({ viewBoxWidth, viewBoxHeight, path }, widthPx, heightPx, options = {}) => {
@@ -1528,9 +1623,14 @@ try {
   ////////////////////////////////////////////////////////////////////////////
 
   console.log(`[google-meet-live-analytics] localStorage version`, getOrSet('version', 1, version = LOCALSTORAGE_VERSION));
-  syncSettings();
+  is_synced = null;
+
+  getAllStorageSyncData();
+  // window.alert("wait");
+  // syncSettings();
   cleanupOnstartupForAccumulatedTranscripts();
   setCurrentTranscriptDetails();
+  setInterval(tryTo(addButtons, 'adding buttons'), 500);
   setInterval(tryTo(addButtonLoop, 'adding button'), 500);
   setInterval(sendData,500);
   setInterval(tryTo(fire_notification, 'firing notification'), 500);
