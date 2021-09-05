@@ -2,6 +2,7 @@ DB_NAME = "test.db"
 import sqlite3
 import pandas as pd
 import datetime
+import re
 
 def log_load(session = "", start:datetime=None):
 
@@ -32,6 +33,11 @@ def log_load(session = "", start:datetime=None):
     df_final = pd.DataFrame([[row, df_sub[(df_sub['substart'] <= row['start']) & ((df_sub['end'] >= row['start']))]] for index, row in
                   df_log.iterrows() if
                   len(df_sub[(df_sub['substart'] <= row['start']) & ((df_sub['end'] >= row['start']))]) > 0])
+    # find ones that were not find in logs and add them...
+    df_final_not_found = pd.DataFrame([[row, df_sub[(df_sub['substart'] <= row['start']) & ((df_sub['end'] >= row['start']))]] for index, row in
+                  df_log.iterrows() if
+                  len(df_sub[(df_sub['substart'] <= row['start']) & ((df_sub['end'] >= row['start']))]) == 0])
+    df_final = pd.concat([df_final,df_final_not_found])
     conn.close()
     # TODO: if a log is registered during the time when no utterance is available. Log should be still written
     #         so that that log will appear somewhere in between the captions
@@ -86,10 +92,28 @@ def get_blending_logs(session="",start:datetime=None,df_caption:pd.DataFrame=Non
     df_log_combined = log_load(session=session,start=start)
     if len(df_caption) == 0:
         return df_caption
-    import re
+
+    found_word = {}
+
     for index, log_details in df_log_combined.iterrows():
         log_line = log_details[0]
         log_located = log_details[1]
+        # TODO: do not replace the same text
+        # TODO: split text into chunks to replace only the relevant part
+
+        if log_located.empty == True:
+            temp_text = "<b>Looged item:" + log_line['logtype'] + "</b>"
+            tmp_se = pd.Series([
+                None,
+                session,
+                log_line['start'],
+                log_line['start'],
+                log_line['actor'],
+                temp_text,
+                ''
+            ], index=df_caption.columns)
+            df_caption = df_caption.append(tmp_se, ignore_index=True)
+
         for index, location_item in log_located.iterrows():
             df_lines = df_caption[df_caption['start'] == location_item['start']]
             if len(df_lines) == 0:
@@ -97,15 +121,19 @@ def get_blending_logs(session="",start:datetime=None,df_caption:pd.DataFrame=Non
             # df_lines['text'] = df_lines['text'].str.replace(location_item['text'],
             #                                                 "("+ log_line['logtype'] +  ":" +str.lower(location_item['text']) + ")")
             temp_text = df_lines['text'].values[0]
-            if log_line['text'] == "no text":
-                re_compile = re.compile(location_item['text'],re.IGNORECASE)
-                temp_text = re_compile.sub("<b>("+ log_line['logtype'] +  ":" +str.lower(location_item['text']) + ")</b>",temp_text)
-            else:
-                re_compile = re.compile(log_line['text'], re.IGNORECASE)
-                temp_text = re_compile.sub("<b>("+ log_line['logtype'] +  ":" +str.lower(location_item['text']) + ")</b>",temp_text)
+            temp_text = temp_text.replace(".","")
+            finding_word = log_line['text']
+            finding_word = finding_word.replace(".","")
+            finding_word = finding_word.replace(" ","")
+            if str([finding_word,location_item['start']]) in found_word:
+                continue
+            found_word[str([finding_word,location_item['start']])] = True
+            re_compile = re.compile(finding_word, re.IGNORECASE | re.MULTILINE)
+            temp_text = re_compile.sub("<b>("+ log_line['logtype'] +  ":" +str.lower(finding_word) + ")</b>",temp_text)
             print(temp_text)
             df_lines['text'].values[0] = temp_text
             df_caption[df_caption['start'] == location_item['start']] = df_lines
+    df_caption.sort_values(['start'], inplace=True)
     return df_caption
 
 def get_delta(session="",start:datetime=None):

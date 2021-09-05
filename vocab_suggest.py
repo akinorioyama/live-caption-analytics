@@ -144,7 +144,26 @@ def vocab_calculate_all(session_string,db_type):
 
     df_new = pd.DataFrame(columns = ['session','start','vocab','category','level','actor',])
 
-    df['text_stemmed'] = df['text'].apply(word_tokenize).apply(lambda x: [[word_and_tag[0],word_and_tag[1],wnl.lemmatize(word_and_tag[0],pos=word_and_tag[1][0].translate( translate_mapping ))] for word_and_tag in pos_tag(x)])
+    try:
+        # df['text_stemmed'] = df['text'].apply(word_tokenize).apply(lambda x: [[word_and_tag[0],word_and_tag[1],wnl.lemmatize(word_and_tag[0],pos=word_and_tag[1][0].translate( translate_mapping ))] for word_and_tag in pos_tag(x)])
+        l_all_entries = []
+        tokenized_df = df['text'].apply(word_tokenize)
+        word_and_tag = tokenized_df.apply(lambda x: [[word_and_tag[0],word_and_tag[1]] for word_and_tag in pos_tag(x)])
+        for w_t_set in word_and_tag:
+            l_entries = []
+            for w_t_item in w_t_set:
+                if w_t_item[1][0] == "'":
+                    continue
+                if w_t_item[1][0] == ".":
+                    continue
+                an_entry = wnl.lemmatize(w_t_item[0],pos=w_t_item[1][0].translate( translate_mapping ))
+                l_entries.append([w_t_item[0],w_t_item[1],an_entry])
+            l_all_entries.append(l_entries)
+        df['text_stemmed'] = l_all_entries
+    except KeyError as e:
+        print(e)
+    except Exception as e:
+        print(e)
 
     for index, row in df.iterrows():
         for line in row['text_stemmed']:

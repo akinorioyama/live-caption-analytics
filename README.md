@@ -51,7 +51,9 @@ Aside from the ***chrome extensions*** and key functions in ***analysis*** and *
 **(In pipeline)**
 
 Candidate 1: ***target vocabulary*** will show the target language for a single session or cross sessions. Checkboxes will be ticked once a word is used in the session. This may use SRS from apps.
-
+- [x] Show list of words to cover (arbitrary option string to define the target words)
+- [ ] Store the target words for each session
+- [ ] Create a list of words for session through context analysis
 
 
 **References**
@@ -61,3 +63,12 @@ Candidate 1: ***target vocabulary*** will show the target language for a single 
 The CEFR-J Wordlist Version 1.5. Compiled by Yukio Tono, Tokyo University of Foreign Studies. Retrieved from https://www.cefr-j.org/data/CEFRJ_wordlist_ver1.5.zip on 25/08/2020.
 
 [Octanove Vocabulary Profile C1/C2 (ver 1.0)](https://github.com/openlanguageprofiles/olp-en-cefrj/blob/master/octanove-vocabulary-profile-c1c2-1.0.csv) — vocabulary list annotated with CEFR-J levels (for C1/C2 levels), created by [Octanove Labs](http://www.octanove.com/). Retrieved on 04/08/2021
+
+**Changes**
+---
+Below are major changes.
+
+|Date|Version|Changes|
+|---|---|---|
+|20210905|v1.0.1|<b>Options</b>: arbitrary option string in chrome extension option to configure what to show.<br><b>Usability</b>: always show extension screen buttons|
+|20210827|v1|<b>Released</b>|
