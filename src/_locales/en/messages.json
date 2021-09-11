@@ -12,7 +12,7 @@
         "message" : "Please choose a word to record for study log, or press Esc to cancel logging.<br><br>"
     },
     "realtime_caption_to_send_to_log": {
-        "message" : "Choose a word to record as misrecognition<br><br>"
+        "message" : "Choose a word to record as unrecognized one<br><br>"
     },
     "realtime_no_caption_to_send_to_log": {
         "message" : "No text in caption."

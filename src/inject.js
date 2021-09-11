@@ -628,6 +628,19 @@ try {
   // Captions element processing
   ////////////////////////////////////////////////////////////////////////////
 
+  const getCaptionDataZoom = () => {
+
+    const caption_element = document.getElementById('live-transcription-subtitle');
+    text = caption_element.innerText;
+
+    return {
+      image: "",
+      person: "zoom user (fixed)",
+      text,
+    };
+  };
+
+
   // -------------------------------------------------------------------------
   // Grab the speaker details and comment text for a caption node
   // -------------------------------------------------------------------------
@@ -713,6 +726,92 @@ try {
   ////////////////////////////////////////////////////////////////////////////
   // Captions element location and observation
   ////////////////////////////////////////////////////////////////////////////
+  const findZoomCaptionContainer = () => {
+    // captionContainerChildObserverZoom.disconnect();
+
+
+    const caption_element = document.getElementById('live-transcription-subtitle');
+    const candidates = [];
+
+    if (caption_element === null){
+      captionContainerAttributeObserverZoom.disconnect();
+      captionsContainer = undefined;
+      return;
+    }
+
+    if (captionsContainer !== undefined){
+
+      // reset observer as it could be renewed
+      captionContainerAttributeObserverZoom.disconnect();
+      captionContainerAttributeObserverZoom.observe(caption_element, {
+        attributes: true,
+        subtree: true,
+        // attributeFilter: ['innerText','innerHtml'],
+        // attributeOldValue: true,
+        characterData: true,
+        characterDataOldValue: true
+      })
+
+      return captionsContainer;
+
+    } else {
+
+      console.log(caption_element.innerText);
+      captionContainerAttributeObserverZoom.disconnect();
+      captionContainerAttributeObserverZoom.observe(caption_element, {
+        attributes: true,
+        subtree: true,
+        // attributeFilter: ['innerText','innerHtml'],
+        // attributeOldValue: true,
+        characterData: true,
+        characterDataOldValue: true
+      });
+      // TODO: this has to be performed only when a new object becomes available?.
+      // updateCurrentTranscriptSessionZoom(caption_element);
+
+      return caption_element;
+    }
+  }
+
+  const captionContainerAttributeObserverZoom = new MutationObserver(tryTo((mutations) => {
+    console.log(mutations);
+    for (let mutation of mutations) {
+      console.log(mutation);
+      if (mutation.type === 'characterData' && mutation.target.nodeName === '#text' ) {
+        const text = mutation.target.textContent;
+        const node = document.getElementById('live-transcription-subtitle');
+        // TODO: text first part should match
+        if (mutation.oldValue.split(" ") === mutation.target.textContent.split(" ").slice(0,mutation.oldValue.split(" ").length )){
+          //updateCurrentTranscriptSessionZoom(caption_element);
+          // newly push
+          const cache = CACHE[index];
+
+          cache.count += 1;
+          cache.endedAt = new Date();
+          cache.text = mutation.target.text;
+
+          setSpeaker(cache);
+
+        } else {
+
+          const currentSpeakerIndex = increment(makeTranscriptKey(currentTranscriptId, currentSessionIndex));
+          CACHE.unshift({
+            ...getCaptionDataZoom(),
+            startedAt: new Date(),
+            endedAt: new Date(),
+            node,
+            count: 0,
+            pollCount: 0,
+            transcriptId: currentTranscriptId,
+            sessionIndex: currentSessionIndex,
+            speakerIndex: currentSpeakerIndex,
+          });
+          setSpeaker(CACHE[0]);
+
+        }
+      }
+    }
+  }, 'executing observer'));
 
   // -------------------------------------------------------------------------
   // Locate captions container in the DOM and attach an observer
@@ -923,7 +1022,12 @@ try {
   // -------------------------------------------------------------------------
   const closedCaptionsAttachLoop = () => {
     // TODO avoid re-attaching tot he same container
-    captionsContainer = findCaptionsContainer();
+    const hostname = document.location.hostname;
+    if (hostname.match("google") !== null){
+      captionsContainer = findCaptionsContainer();
+    } else if (hostname.match("zoom") !== null){
+      captionsContainer = findZoomCaptionContainer();
+    }
 
     debug('attached to closed captions');
 
@@ -1220,6 +1324,9 @@ try {
 
   const fire_notification = () => {
     if (isTextAreaCreated === null ){
+      return;
+    }
+    if (speava_session_notification === null || speava_session_notification === false){
       return;
     }
     if (speava_async_response_notification === null || speava_async_response_notification === undefined) {
@@ -1571,15 +1678,22 @@ try {
     // if (language_setting_browser !== "en") {
     //   window.alert("Switch your browser language to en. Otherwise, this extension will not work.");
     // }
-
-    const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
-    if ( pathString === null || pathString[2] !== "en"){
-      const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
-      window.alert(msg_string);
+    let cc_button_path;
+    const hostname = document.location.hostname;
+    if (hostname.match("google") !== null){
+      cc_button_path = `//button[contains(@aria-label,"captions (c)")]`;
+      const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
+      if ( pathString === null || pathString[2] !== "en") {
+        const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
+        window.alert(msg_string);
+      }
+    } else if (hostname.match("zoom") !== null){
+      cc_button_path = `//div[@class="join-audio-container"]`
+      captionsContainer = findZoomCaptionContainer();
     }
 
     // hide panes if the user is not in a meeting.
-    const captionsButtonAvailability = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
+    const captionsButtonAvailability = xpath(cc_button_path, document);
     const notification_area = document.getElementById("speava_session_notification");
     const feedback_textarea = document.getElementById("speava_textarea");
     const element_caption_reaction = document.getElementById("speava_caption_reaction");

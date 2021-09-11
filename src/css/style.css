@@ -48,60 +48,45 @@
         font-size : 12px;
     }
 
-    #speava_textarea > div .item {
+    .item {
         color : #FFFFFF;
         font-size : 12px;
-        /*line-height: 12px;*/
         z-index: 101;
-        width:100px;
         display:inline-block;
     }
-    #speava_textarea > div .head {
+    .head {
         color : #FFFFFF;
-        /*line-height: 24px;*/
         font-size : 24px;
         z-index: 101;
-        width:100px;
         display:inline-block;
     }
 
-    #speava_textarea > div > span.item {
+    .item_blue {
         color : #FFFFFF;
-        background-color : darkblue;
+        background-color : darkblue !important;
         font-size : 24px;
         display:inline-block;
     }
 
-    #speava_textarea > div > span.item_red {
+    .item_red {
         color : #FFFFFF;
-        background-color : indianred;
+        background-color : indianred !important;
         font-size : 24px;
         display:inline-block;
     }
 
-    #speava_textarea > div > span.text_item {
+    .text_item {
         color : #FFFFFF;
         font-size : 24px;
         /*line-height: 12px;*/
         display:inline-block;
     }
 
-    #speava_textarea > div > span.text_head {
+    .text_head {
         color : #FFFFFF;
         /*line-height: 24px;*/
         font-size : 48px;
         display:inline-block;
-    }
-
-    #speava_caption_container > div {
-        /*display: flex !important;*/
-        /*flex-flow: column;*/
-        /*flex-direction: column !important;*/
-        /*position : absolute !important;*/
-        /*left : 300px !important;*/
-        /*top : 144px !important;*/
-        /*size : 150px !important;*/
-
     }
 
     #speava_caption_container  {
@@ -111,6 +96,21 @@
         position : absolute !important;
         left : 300px !important;
         top : 144px !important;
-        /*size : 150px !important;*/
+    }
+
+    .repeat_flash {
+        animation-name: blinking;
+        animation-duration: 2s;
+        animation-iteration-count: infinite;
+        font-size: 24px;
+    }
+
+    @keyframes blinking {
+        from {
+            color: #FFFFFF;
+        }
+        to {
+            color: indianred;
+        }
 
     }
