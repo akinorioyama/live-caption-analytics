@@ -86,7 +86,7 @@ def vocab_result_load(session = ""):
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
 
-    df = pd.read_sql("select actor, level, vocab from vocab_aggregate where session = '" + session + "'",
+    df = pd.read_sql("select actor, level, vocab, start from vocab_aggregate where session = '" + session + "'",
                      conn)
 
     conn.close()
@@ -95,49 +95,63 @@ def vocab_result_load(session = ""):
 
 
 
-def vocab_calculate_all(session_string,db_type):
+def vocab_calculate_all(session_string="",include_last_record=False,since_last_update = None):
+                        # only_last_record_for_current=False, # removed part of since_last_update
+
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     columns = ['id', 'session', 'start', 'end', 'actor', 'text']
+    max_start = None
+    max_processed_vocab_start = None
 
-    if db_type != "past":
-        # current: build only with caption_sub for the latest caption
-        # max start for the session to perform further search?
-        df_max = pd.read_sql("SELECT max(start) FROM caption " + \
+    if since_last_update == True:
+        df_vocab_max = pd.read_sql("SELECT max(start) FROM vocab_aggregate " + \
                              " where session = '" + session_string + "'", conn)
-        max_start = df_max['max(start)'].values[0]
+        max_processed_vocab_start = df_vocab_max['max(start)'].values[0]
 
-        df = pd.read_sql("SELECT " + str.join(",",columns) + \
-                         " FROM caption_sub " + \
-                         " where session = '" + session_string + "'" + \
-                         " and start = '" + max_start + "'", conn)
-        df.columns = columns
-        df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S")
-        df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S")
+    kwargs = []
+
+    df_max = pd.read_sql("SELECT max(start) FROM caption " + \
+                         " where session = '" + session_string + "'", conn)
+    max_start = df_max['max(start)'].values[0]
+
+    if session_string is not None:
+        # if session_string == "%":
+        #     kwargs.append(['session',session_string, "like"])
+        # else:
+        kwargs.append(['session', session_string, "="])
+    # TODO: potential parallel updates...
+    #  need a mehanism to exclude the latest ones where caption is still being updated
+    if include_last_record == False:
+        if max_start is not None:
+            item = ["start",max_start, "<"]
+            kwargs.append(item)
+
+    if since_last_update == True:
+        if max_processed_vocab_start is not None:
+            item = ["start",max_processed_vocab_start, ">"]
+            kwargs.append(item)
+    elif since_last_update == False:
+        if max_processed_vocab_start is not None:
+            item = ["start", max_processed_vocab_start, "<="]
+            kwargs.append(item)
+    if len(kwargs) == 0:
+        where_clause = ""
     else:
-        # past
-        # max start for the session to perform further search?
-        df_max = pd.read_sql("SELECT max(start) FROM vocab_aggregate " + \
-                             " where session = '" + session_string + "'", conn)
-        max_start = df_max['max(start)'].values[0]
-        if max_start is None:
-            df = pd.read_sql("SELECT " + str.join(",", columns) + \
-                             " FROM caption" + \
-                             " where session = '" + session_string + "'",
-                             conn)
-            df = df[0:-1]
-            #avoid processing the latest line because the latest line processing entails delta process for level mapping
+        where_clause = 'WHERE ' + ' AND '.join(
+            [k[0] + ' %s "%s"' % (k[2], k[1]) for k in kwargs])
 
-        else:
-            df = pd.read_sql("SELECT " + str.join(",",columns) + \
-                             " FROM caption" + \
-                             " where session = '" + session_string + "'" + \
-                             " and start > '" + max_start + "'",
-                             conn)
-        df.columns = columns
-        df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S")
-        df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S")
+    print("read caption with where:", where_clause)
+    df = pd.read_sql("SELECT " + str.join(",", columns) + \
+                     " FROM caption " + \
+                     where_clause,
+                     conn)
+
+    df.columns = columns
+    df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['text'] = df['text'].str.lower()
 
     if len(df) == 0:
         return None
@@ -167,6 +181,10 @@ def vocab_calculate_all(session_string,db_type):
 
     for index, row in df.iterrows():
         for line in row['text_stemmed']:
+            if line[2] in stop_words:
+                continue
+            if ',' in line[2]:
+                continue
             if line[2] in dict_cefr_level:
                 tmp_se = pd.Series([
                     row['session'],
@@ -174,6 +192,16 @@ def vocab_calculate_all(session_string,db_type):
                     line[2],
                     'CEFRJ',
                     dict_cefr_level[line[2]],
+                    row['actor']
+                ], index=df_new.columns)
+                df_new = df_new.append(tmp_se, ignore_index=True)
+            else:
+                tmp_se = pd.Series([
+                    row['session'],
+                    row['start'],
+                    line[2],
+                    'CEFRJ',
+                    'NA',
                     row['actor']
                 ], index=df_new.columns)
                 df_new = df_new.append(tmp_se, ignore_index=True)
@@ -292,8 +320,10 @@ def suggest_words(target_level_equal_and_above = "C2",df = None, df_target_langu
         if word in df_add_to_reference['word'].values:
             list_synonym.append(df_add_to_reference[df_add_to_reference['word']==word]['response'].values[0])
         elif word in df_reference['word'].values:
+            word = word.replace("'","")
             df_single_word_reference = pd.read_sql("SELECT * from merriam_data where word = '" + word + "'", conn)
-            list_synonym.append(df_single_word_reference['response'].values[0])
+            if len(df_single_word_reference) != 0:
+                list_synonym.append(df_single_word_reference['response'].values[0])
         else:
             url = f'https://www.dictionaryapi.com/api/v3/references/thesaurus/json/{word}?key={key}'
             response = requests.get(url)
@@ -315,18 +345,21 @@ def get_frequently_used_words(session=None,actor=None,start:datetime=None):
 
     kwargs = {}
     if session is not None:
-        kwargs['session'] = [session,"="]
+        if session == "%":
+            kwargs['session'] = [session, "LIKE"]
+        else:
+            kwargs['session'] = [session,"="]
     if actor is not None:
         kwargs['actor'] = [actor,"="]
     if start is not None:
-        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S"),">="]
+        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S.%f"),">="]
     if len(kwargs) == 0:
         where_clause = ""
     else:
         where_clause = 'WHERE ' + ' AND '.join([k + ' %s "%s"' % (kwargs[k][1],kwargs[k][0]) for k in kwargs.keys()])
 
     sql_string = \
-        'select count(vocab), vocab, start, session, level from vocab_aggregate ' + \
+        'select count(vocab), vocab,actor, session, level from vocab_aggregate ' + \
         where_clause + \
         ' group by vocab, actor, session order by count(vocab) desc'
 
@@ -351,9 +384,41 @@ if __name__ == "__main__":
     # TODO: identify the words that are repeatedly used by speaker (cross sessions and in a single session)
     # TODO: suggest words that are synonyms of the uttered words at or above certain profile level
     session = "your session name"
-    df = vocab_calculate_all(session_string = session, db_type="past")
-    df_sum = get_stats_for_levels_db(session_string=session)
-    vocab_result_save(df=df, db_target_name ='vocab_aggregate')
+    # dbname = DB_NAME
+    # conn = sqlite3.connect(dbname)
+    #
+    # df_end_max = pd.read_sql("SELECT max(end) FROM caption where " + \
+    #                               " session = '" + session + "'"
+    #                               , conn)
+    # conn.commit()
+    # conn.close()
+    #
+    # if df_end_max is not None:
+    #     last_processed_time = pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime()
+    #     if ((last_processed_time + datetime.timedelta(minutes=2)) < datetime.datetime.now()):
+    #         print("updated due to max elapsed time")
+    #         df = vocab_calculate_all(session_string=session, since_last_update=True, include_last_record=True)
+    #         vocab_result_save(df=df, db_target_name="vocab_aggregate")
+
+    session_start = datetime.datetime(2020,9,10,0,0,0)
+    session_start_string = session_start.strftime("%Y-%m-%d %H:%M:%S.%f")
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+
+    df_session_list = pd.read_sql("SELECT distinct session FROM caption where " + \
+                                  " start >= '" + session_start_string + "'"
+                                  , conn)
+    conn.commit()
+    conn.close()
+
+    for index, session_item in df_session_list.iterrows():
+        session = session_item['session']
+        print(f"Processing session:{session}")
+        df = vocab_calculate_all(session_string = session, include_last_record=True)
+        df_sum = get_stats_for_levels_db(session_string=session)
+        vocab_result_save(df=df, db_target_name ='vocab_aggregate')
+    import sys
+    sys.exit(1)
     df = vocab_result_load(session=session)
     df_freq_session = get_frequently_used_words(session=session)
     # df = get_frequently_used_words(session=session,

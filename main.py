@@ -25,6 +25,7 @@ from docopt import docopt
 
 from flask import Flask, request, jsonify,json
 from flask_cors import CORS
+from flask import render_template
 import pandas as pd
 from vocab_suggest import vocab_calculate_all
 from vocab_suggest import get_stats_for_levels_db
@@ -38,11 +39,60 @@ from save_to_storage import get_caption_html
 from save_to_storage import get_delta
 from save_to_storage import get_blending_logs
 from json import JSONDecodeError
+import config_settings
 DB_NAME = "test.db"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
+
+def is_correct_session_access_code(session_string="", option_settings=""):
+
+    #  - ip and username will not work due to users not sending any data to server
+    # 1: with json access_key
+    # read session_access_code and grant action if correct
+
+
+
+    return True, None
+
+@app.route('/prompt_check',methods=['POST','GET'])
+def return_prompt_options():
+    data_received = request.get_data().decode('utf-8')
+    data_json = json.loads(data_received)
+    username = data_json['username']
+    session_string = data_json['transcriptId']
+    print("username:",username)
+    option_settings = data_json['option_settings']
+
+    config_server_security_granted, message_json = config_settings.get_full_access_settings()
+    if config_server_security_granted is None:
+        # use error text
+        return message_json
+    elif config_server_security_granted != True:
+        # true: fullaccess granted
+        is_granted, message_json = is_correct_session_access_code(session_string=session_string, option_settings=option_settings)
+        if is_granted != True:
+            return  message_json
+
+
+    if (datetime.datetime.now().second % 30 == 0):
+
+        data_show = {"notification": {"text": "no data exists from Meet"},
+                     "heading": "Would you like to volunteer to answer the question? Choose an option from the prompt",
+                     "prompt_options": "Yes<br>,No<br>,Maybe",
+                     "setting":
+                         {"duration": 10}
+                     }
+        return jsonify(data_show)
+    else:
+        data_show = {"notification": {"text": "no data exists from Meet"},
+                     "heading": "no data",
+                     "prompt_options": "",
+                     "setting":
+                         {"duration": 10}
+                     }
+        return jsonify(data_show)
 
 @app.route('/caption',methods=['POST','GET'])
 def return_caption():
@@ -145,6 +195,21 @@ def return_heartbeat():
     df['dif'] = df['end'] - df['start']
     df['session'] = session_string
     df['actor_ip'] = user_ip_address
+
+    # if (datetime.datetime.now().second % 4 == 0):
+    #     sequence = int(datetime.datetime.now().second / 4) + int(datetime.datetime.now().minute * 60 / 4) + \
+    #                int(datetime.datetime.now().hour * 3600 / 4) + int(datetime.datetime.now().day * 86400 / 4)
+    #     # sending_text = df['text'][-1:].to_string().encode('utf-8')
+    #     sending_text = str(sequence).encode('utf-8') + \
+    #                    str.join("\n", [str.join(" ", df['text'][-1:].to_string().split(" ")[a:a + 8]) for a in
+    #                                    range(0, len(df['text'][-1:].to_string().split(" ")), 8)]).encode('utf-8')
+    #     url =  "http://API call"
+    #     url += f"&seq={sequence}&lang=en-US"
+    #     import requests
+    #     post_data_to_endpoint = sending_text
+    #     return_object = requests.post(url, data=post_data_to_endpoint)
+    #     print(f"endpoint response ({sending_text})",return_object.text,return_object.status_code)
+    #
     # print("df in /",df)
     # print(df.columns)
     df.drop(['dateStart','dateEnd','dif'],axis=1, inplace=True)
@@ -192,7 +257,11 @@ def return_heartbeat():
                           df_existing = df_existing,
                           df_existing_sub = df_existing_sub,
                           df_existing_sub_new=df_existing_sub_new)
-
+    # read last vocab_aggregate
+    #   find caption larger than max in vocab_aggregate, but not max of df
+    df_vocab = vocab_calculate_all(session_string=session_string, since_last_update = True, include_last_record=False)
+    #TODO: last record needs processing after the session close
+    vocab_result_save(df=df_vocab ,db_target_name="vocab_aggregate")
 
     data = [{"name": "data received",
              "duration": 0}]
@@ -218,6 +287,30 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
             df_existing = df_existing[-df_to_remove_index]
     df.drop(index=df_remove_list, inplace=True)
     df_remove_list = []
+
+    df_update_list = []
+    # only the end time is updated
+    for index, row in df.iterrows():
+        # to skip processing (update of the time needed)
+        #   TODO: should the caption_sub be updated
+        df_to_update_index = ((df_existing['start'] == row['start']) & (df_existing['end'] != row['end']) & \
+                              (df_existing['actor'] == row['actor']) & (df_existing['session'] == row['session']) &
+                              (df_existing['text'] == row['text']))
+        # df_to_remove_index = ((row['start'].isin(df_existing['start']))&(row['end'].isin(df_existing['end']))& \
+        #             (row['actor'].isin(df_existing['actor']))&(row['session'].isin(df_existing['session']))&
+        #             (row['text'].isin(df_existing['text'])))
+        if len(df_existing[df_to_update_index]) != 0:
+            # df_existing[df_to_update_index]['end'][0], df['end'][0], df_existing.iloc[1, :], df_to_update_index, \
+            # df_existing[df_to_update_index].index, df_existing.iloc[
+            df_existing.iloc[df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')] = pd.Series(
+                row['end'])
+            #     df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')], pd.Series(row['end'])
+            df_update_list.append(index)
+            # update table entry and dataframe
+            # df_existing[df_to_update_index]
+
+
+
     # replace pairs
     maketrans_str = {'.': '',
                      ',': '',
@@ -329,8 +422,10 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
         #   1) first part in old match new => extend to the last part
         row_words = row['text'].translate(maketrans_pairs).replace('  ', ' ').upper().rstrip().split(" ")
         for index_existing, existing_row in df_existing[df_to_compare_index].iterrows():
+
+            existing_words = existing_row['text'].translate(maketrans_pairs).replace('  ', ' ').upper().rstrip().split(" ")
             #   0) all parts match
-            if existing_row['text'] == row['text']:
+            if (existing_words == row_words) == True:
                 is_found_in_the_pattern_1 = True
                 is_found_in_the_pattern_2 = True
                 df_remove_list.append(index)  # no additional entry needed in df
@@ -338,7 +433,7 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
                 break
 
             #   1) first part in old match new => extend to the last part
-            existing_words = existing_row['text'].translate(maketrans_pairs).replace('  ', ' ').upper().rstrip().split(" ")
+            # existing_words = existing_row['text'].translate(maketrans_pairs).replace('  ', ' ').upper().rstrip().split(" ")
 
             # overwrite with new one + delta to be added to sub by deleting the old one and
             # find last part of existing one and find additional text to add to a new caption_sub
@@ -438,6 +533,10 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
         #     incoming text is longer -> can't find it in the past lines....
         s_row = set(row_words)
 
+        # remove the ones that have been invalidated to avoid processing the invalided ones again
+        df_existing.drop(index=df_existing_remove_list, inplace=True)
+        df_existing_remove_list = []
+
         for index_existing, existing_row in df_existing[df_to_compare_index].iterrows():
             existing_words = existing_row['text'].translate(maketrans_pairs).replace('  ', ' ').upper().split(" ")
 
@@ -465,6 +564,7 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
             if len(n_gram_row) == 0 or len(n_gram_exist) == 0:
                 print("shorter than length = 3")
             # TODO: handle fewer words
+            #   critically essential to handle for zoom due to the smaller size of letters sent to server.
             if n_gram_row[0] in n_gram_exist:
                 found_new_in_past = [i for i, x in enumerate(n_gram_exist) if x == n_gram_row[0]]
                 found_new_in_past = found_new_in_past[0]
@@ -492,6 +592,8 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
                     # "It's my time. You don't want to find plenty of other outlets Will. Wait. I don't like you and I never will ponytail. I don't need you to like me. Sure. Guy. After insults, as you are reporting. Come back tomorrow. Maybe I can teach you something. Do you know? There it is. All the kryptonite on earth.   Thank you.")
                     #'GUY DRAWS BETTER INSULTS AS YOU'
                     #" ".join(existing_words[max([i for existing, row, i in zip(existing_words, row_words, range(0, 10000, 1)) if existing == row]):])
+                    if len(frontload_latter_part) == 0:
+                        print("DEBUG here")
                     last_match_word_count = max([i for existing, row, i in zip(frontload_latter_part, row_words, range(0, 10000, 1)) if existing == row]) + 1
                     delta_text = " ".join(row_words[last_match_word_count:])
                     # TODO: match with existing to get lower-case in caption_sub
@@ -563,6 +665,39 @@ def update_captions_to_db(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,
 
     return
 
+@app.route('/render_in_full',methods=['GET'])
+def return_all_results():
+
+    received_session = request.args.get('session')
+    session_string = received_session
+    allowed_function_list = ['get_default_sample_1',
+                             'get_vacab_acknowledge_use',
+                             'get_vacab_sugestion',
+                             'get_vocab_coverage',
+                             'get_turn_taking',
+                             'get_vocab_frequency',
+                             'get_word_per_second']
+    data_all = []
+
+    data_show = {"notification": {"text": f"session:{received_session}"},
+                 "heading": "Frequency",
+                 "setting":
+                     {"duration": 500}
+                 }
+    data = jsonify(data_show)
+    data_all.append(data.json)
+    for function_item in allowed_function_list:
+        if function_item == 'get_vocab_coverage':
+            kwargs = {"session_string": session_string, "option_settings": {}}
+        else:
+            kwargs = {"session_string": session_string}
+
+        data = globals()[function_item](**kwargs)
+        data_all.append(data.json)
+    text = render_template('show_all.html', data=data_all)
+    return text
+
+
 @app.route('/notification',methods=['POST','GET'])
 def return_notification():
     data_received = request.get_data().decode('utf-8')
@@ -578,30 +713,15 @@ def return_notification():
 
     data = jsonify(data)
 
-    option_json = json.loads(option_settings)
+    if option_settings != "":
+        option_json = json.loads(option_settings)
 
-    data = dynamic_function_call(option_json=option_json,session_string=session_string,section="/notification")
+        data = dynamic_function_call(option_json=option_json,session_string=session_string,section="/notification")
 
-    if data is not None:
-        return data
-    # if 'calling_functions' in option_json:
-    #
-    #     frequency = int(option_json['calling_functions']['frequency'])
-    #     function_list = option_json['calling_functions']['function_list']
-    #
-    #     mod_of_time = datetime.datetime.now().second % frequency
-    #     for function_item in function_list:
-    #         if function_item['from'] <= mod_of_time <= function_item['to']:
-    #             function_name = function_item['function_name']
-    #             allowed_function_list = ['get_default_sample_1','get_vocab_coverage']
-    #             if function_name in allowed_function_list:
-    #                 if function_name == 'get_vocab_coverage':
-    #                     kwargs = {"session_string": session_string, "option_settings": option_json}
-    #                 else:
-    #                     kwargs = {"session_string": session_string}
-    #
-    #                 data = globals()[function_name](**kwargs)
-    #                 return data
+        if data is not None:
+            return data
+    else:
+        option_json = {}
 
     if (datetime.datetime.now().second % 20) <= 1:
 
@@ -656,22 +776,26 @@ def return_stat_result():
     option_settings = data_json['option_settings']
     print("username:",username)
     data_return = None
-    option_json = json.loads(option_settings)
 
-    data_return = dynamic_function_call(option_json=option_json, session_string=session_string,section="/show")
+    if option_settings != "":
+        option_json = json.loads(option_settings)
 
-    if data_return is not None:
-        return data_return
+        data_return = dynamic_function_call(option_json=option_json, session_string=session_string,section="/show")
 
-    if (datetime.datetime.now().second % 30) <= 5:
+        if data_return is not None:
+            return data_return
+    else:
+        option_json = {}
+
+    if (datetime.datetime.now().second % 15) <= 5:
 
         data_return = get_turn_taking(session_string=session_string)
 
-    elif 5 < (datetime.datetime.now().second % 30) < 20:
+    elif 5 < (datetime.datetime.now().second % 15) < 10:
 
         data_return = get_word_per_second(session_string)
 
-    elif 20 < (datetime.datetime.now().second % 30) < 25:
+    elif 10 < (datetime.datetime.now().second % 15) < 15:
 
         data_return = get_vocab_frequency(session_string=session_string)
 
@@ -749,7 +873,7 @@ def dynamic_function_call(option_json={}, session_string="",section="/show"):
                          }
             return data
         except Exception as e:
-            data_= {"notification": {"text": "Exception error occured"},
+            data = {"notification": {"text": "Exception error occured"},
                          "heading": "Error in Arbitrary option setting:",
                          "setting":
                              {"duration": 2000}
@@ -761,7 +885,7 @@ def dynamic_function_call(option_json={}, session_string="",section="/show"):
 def get_default_sample_1(session_string=""):
 
     data = {"notification": {"name": "ヒント:",
-                             "text": "他の表現も使ってみましょう"},
+                             "text": '<div class="item" style="word-break:break-word;">他の表現も使ってみましょう</div>'},
             "setting":
                 {"duration": 2000}
             }
@@ -772,14 +896,49 @@ def get_default_sample_1(session_string=""):
 
 def get_vacab_acknowledge_use(session_string=""):
 
-    share_text = ""
+    share_text = "<div>"
+    is_tag_opened = False
     df_freq_session = get_frequently_used_words(session=session_string)
     df_freq_session = remove_stopwords_entry(df=df_freq_session)
     df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] >= 1) & (df_freq_session['level'] >= "B1")]
+
+    df_recent = vocab_calculate_all(session_string=session_string, include_last_record=True)
+    if df_recent is not None:
+        df_recent = df_recent[df_recent['start'] >= ( df_recent['start'].max() - datetime.timedelta(minutes=1))]
+    # recent vocab is not present in the vocab list
+    df_freq_session.drop_duplicates(subset=['vocab'], inplace=True)
     if df_freq_session is not None:
+        df_freq_session['vocab'] = df_freq_session['vocab'].str.replace("*","")
         for index, row in df_freq_session.iterrows():
-            share_text += row['vocab'] + ","
+            if df_recent is not None:
+                try:
+                    from re import error as re_error
+                    if df_recent['vocab'].str.contains(row['vocab']).sum() == 0:
+                        # if is_tag_opened == False:
+                        #     is_tag_opened = True
+                        #     share_text += "<span class='item'>"
+                        # share_text += row['vocab'] + ",　</span>"
+                        share_text += "<span>" + row['vocab'] + ",　</span>"
+                    else:
+                        # if is_tag_opened == True:
+                        #     is_tag_opened = False
+                        #     share_text += "</span>"
+                        share_text += "<span class='repeat_flash'>" + row['vocab'] + ",　</span>"
+                except re_error as e:
+                    # row['vocab'] 's***'
+                    print(e)
+                except Exception as e:
+                    print(e)
+            else:
+                # if is_tag_opened == True:
+                #     is_tag_opened = False
+                #     share_text += "</span>"
+                share_text += "<span clsss='repeat_flash'>" + row['vocab'] + ",　</span>"
+    # if is_tag_opened == True:
+    #     share_text += "</span>"
+
     share_text += "が使えています"
+    share_text += "</div>"
     data = {"notification":{"name": "いいね！",
              "text": share_text},
             "setting":
@@ -792,15 +951,52 @@ def get_vacab_acknowledge_use(session_string=""):
 
 def get_vacab_sugestion(session_string=""):
 
-    df = vocab_calculate_all(session_string=session_string, db_type="past")
+    df_caption = vocab_calculate_all(session_string=session_string, since_last_update=False)
     # df_sum = get_stats_for_levels_db(session_string=session_string)
-    vocab_result_save(df=df, db_target_name='vocab_aggregate')
-    df = vocab_result_load(session=session_string)
+    # vocab_result_save(df=df_caption, db_target_name='vocab_aggregate') #save only in the incoming message
     df_freq_session = get_frequently_used_words(session=session_string)
+    # merge
+    df_caption_last_only = vocab_calculate_all(session_string=session_string,include_last_record=True, since_last_update=True)
+    if df_caption_last_only is not None:
+        for index, row in df_freq_session[df_freq_session['vocab'].isin(df_caption_last_only['vocab'])].iterrows():
+            df_freq_line = df_caption_last_only[df_caption_last_only['vocab']==row['vocab']]
+            df_freq_session.at[index,'count(vocab)'] = len(df_freq_line) + row['count(vocab)']
+
     df_freq_session = remove_stopwords_entry(df=df_freq_session)
+    #TODO allow config
     df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] >= 1) & (df_freq_session['level'] >= "B1")]
-    df = df[df['vocab'].isin(df_freq_session['vocab'])]
-    list_responses = suggest_words(target_level_equal_and_above="B1", df=df)
+
+    if df_caption is None:
+        data = {"notification": {"name": "使ってみて",
+                                 "text": "no data has been stored. Wait until you have spoken the sufficient amount of words"},
+                "setting":
+                    {"duration": 2000}
+                }
+
+        data = jsonify(data)
+
+        return data
+
+    # look back until the sufficient number (>= 5) of suggestions is found
+    #TODO allow config
+    list_responses = []
+    look_back_set = [2,4,6,100]
+    look_back_used = 100
+    for look_back_length in look_back_set:
+        if len(df_caption) != 0:
+            df_caption_to_evaluate = df_caption[df_caption['start'] >= (df_caption['start'].max() - datetime.timedelta(minutes=look_back_length))]
+            # df_to_look_for = df[df['vocab'].isin(df_freq_session['vocab'])] df is redundant
+            df_to_look_for = df_freq_session[df_freq_session['vocab'].isin(df_caption_to_evaluate['vocab'])]
+            df_to_look_for.drop_duplicates(subset=['vocab'],inplace=True)
+            if len(df_to_look_for) != 0:
+                # TODO allow config
+                list_responses = suggest_words(target_level_equal_and_above="B1", df=df_to_look_for)
+                if len(list_responses) >= 5 or look_back_length == look_back_set[len(look_back_set)-1]:
+                    look_back_used = look_back_length
+                    break
+            else:
+                continue
+        # if look_back_length == look_back_set[len(look_back_set)-1]:
     if len(list_responses) != 0:
         list_suggestion_rel = extract_words_from_response(list_responses, "syn_list")
         df_suggestion_rel = pd.DataFrame([[wp[0], wp[1], a, b, l] for wp, a, b, l in list_suggestion_rel],
@@ -808,32 +1004,79 @@ def get_vacab_sugestion(session_string=""):
     else:
         df_suggestion_rel = None
     share_text = '<br>'
+    share_text += f'<div>look back for {str(look_back_used)} minutes</div>eeo'
     share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;">'
     share_text += f'<span style="width:64px;display:inline-block" class="head">word</span>' \
-                  f'<span style="width:128px;display:inline-block" class="head">suggestion</span>' \
-                  f'<span style="width:64px;display:inline-block" class="head">level</span>' \
-                  f'<span style="width:70%;display:inline-block" class="head">definition</span>' \
+                  f'<span style="width:512px;display:inline-block" class="head">suggestion</span>' \
+                  f'<span style="width:24px;display:inline-block" class="head">level</span>' \
+                  f'<span style="width:200px;display:inline-block" class="head">definition</span>' \
                   f'</div>'
 
     if df_suggestion_rel is not None:
         other_rels = ",".join(list(df_suggestion_rel.drop_duplicates(subset=['vocab'])['vocab'].values))
-        df_suggestion_rel_top10 = df_suggestion_rel[0:5]
-        df_suggestion_rel_top10.sort_values(['level','vocab'],inplace=True, ascending=[False,True])
-        for index, row in df_suggestion_rel_top10.iterrows():
-            row['definition'][1] = str(row['definition'][1]).replace("{it}","<i>")
-            row['definition'][1] = str(row['definition'][1]).replace("{/it}","</i>")
+        df_suggestion_rel['definition_text'] = [b[1] for a in df_suggestion_rel['definition'] for b in a for c in b if c == "text"]
+        df_suggestion_rel['definition_vis'] = [b[1] for a in df_suggestion_rel['definition'] for b in a for c in b if c == "vis"]
+        # [[a[0], a[1]] for a in df_suggestion_rel_top10.groupby(['vocab', 'definition_text']).groups.items()]
+        df_suggestion_rel.sort_values(['vocab', 'definition_text'], inplace=True, ascending=[True, True])
+        group_index = df_suggestion_rel.groupby(['vocab', 'definition_text']).groups.items()
+        group_suggestion = [df_suggestion_rel['suggestion'][a[1]] for a in
+         df_suggestion_rel.groupby(['vocab', 'definition_text']).groups.items()]
+        group_level = [df_suggestion_rel['level'][a[1]] for a in
+         df_suggestion_rel.groupby(['vocab', 'definition_text']).groups.items()]
+
+        df_suggestion_rel_final = pd.DataFrame(
+            {
+                "vocab": df_suggestion_rel['vocab'],
+                "definition_text": df_suggestion_rel['definition_text'],
+                "definition_vis": df_suggestion_rel['definition_vis'],
+                "level": df_suggestion_rel['level'],
+                "suggestion": df_suggestion_rel['suggestion'],
+            })
+        df_suggestion_rel_final.drop_duplicates(subset=['vocab','definition_text'],inplace=True)
+        l_suggestion = []
+        for item_group in zip(group_suggestion,group_level):
+            level_text = ""
+            vocab_list_text = ""
+            df_item = pd.DataFrame({
+                "level": item_group[1],
+                "text": item_group[0],
+            }
+            )
+            df_item_na = df_item[df_item['level']=='NA']
+            df_item_with_level = df_item[-(df_item['level']=='NA')]
+            df_item_with_level.sort_values(['level','text'],inplace=True,ascending=[False,False])
+            df_item = pd.concat([df_item_with_level,df_item_na])
+
+            for index, item_row in enumerate(df_item.iterrows()):
+                item = item_row[1]
+                if index == 0:
+                    level_text = item['level']
+                    vocab_list_text = f"({level_text}) {item['text']}"
+                    continue
+                if level_text == item['level']:
+                    vocab_list_text += f", {item['text']}"
+                else:
+                    level_text = item['level']
+                    vocab_list_text += f"({level_text}) {item['text']}"
+
+            l_suggestion.append(vocab_list_text)
+        df_suggestion_rel_final['combined'] = l_suggestion
+
+        for index, row in df_suggestion_rel_final.iterrows():
+            row['definition_vis'] = str(row['definition_vis']).replace("{it}","<i>")
+            row['definition_vis'] = str(row['definition_vis']).replace("{/it}","</i>")
             share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;">'
             share_text += f'<span style="width:64px;font-size:16px;display:inline-block;word-wrap: break-word;" class="item">{row["vocab"]}</span>' \
-                          f'<span style="width:128px;font-size:24px;display:inline-block;word-wrap: break-word;" class="item">{row["suggestion"]}</span>' \
+                          f'<span style="width:512px;font-size:24px;display:inline-block;word-wrap: break-word;" class="item">{row["combined"]}</span>' \
                           f'<span style="width:64px;font-size:16px;display:inline-block" class="item">{row["level"]}</span>' \
-                          f'<span style="width:70%;font-size:16px;display:inline-block" class="item">{row["definition"]}</span>'
+                          f'<span style="width:200px;font-size:16px;display:inline-block" class="item">{row["definition_text"]}</span>'
             share_text += '</div>'
         share_text += '<br><br><br><div>Other synonyms available for the words (' + other_rels + ')</div>'
 
     data = {"notification":{"name": "使ってみて",
              "text": share_text },
             "setting":
-            {"duration": 8000}
+            {"duration": 1000}
             }
 
     data = jsonify(data)
@@ -845,7 +1088,7 @@ def get_vocab_coverage(session_string="",option_settings={}):
     try:
         parsed_option_settings = option_settings
     except JSONDecodeError as e:
-        data_show = {"notification": {"text":"Incorrect arbitary option settings"},
+        data_show = {"notification": {"text":"Incorrect arbitrary option settings"},
                  "heading": "No data",
                  "setting":
                      {"duration": 500}
@@ -855,80 +1098,142 @@ def get_vocab_coverage(session_string="",option_settings={}):
     except Exception as e:
         parsed_option_settings = None
 
-    if parsed_option_settings is not None:
-        dbname = DB_NAME
-        conn = sqlite3.connect(dbname)
-        df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
-        conn.close()
+    # else: if parsed_option_settings is None:
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
+    df_vocab_list = pd.read_sql("SELECT * FROM session_settings where session = '" + session_string + "'" + \
+                                " and key = 'vocab_to_cover'"
+                                , conn)
+    conn.close()
 
-        vocab_list_used = {}
-        vocab_list = ['successive','following']
-        share_text = ''
-        if 'vocab' in parsed_option_settings:
-            vocab_list = parsed_option_settings['vocab']
-            for item in vocab_list:
-                if df['text'].str.contains(item,case=False).sum() > 0:
-                    vocab_list_used[item] = True
-
-        data_json = {}
-        share_text = ''
-        share_text += '<div>' \
-                                 '<span class="head" style="width:40px;"></span>' \
-                                 '<span class="head" style="width:150px;">vocab.</span>' \
-                                 '</div>'
-        for item in vocab_list:
-            if item in vocab_list_used:
-                share_text += f'<div><span class="item" style="width:40px;">[X]</span>' \
-                                         f'<span class="item">{item}</span></div>'
-            else:
-                share_text += f'<div><span class="item" style="width:40px;">[]</span>' \
-                                         f'<span class="item_red">{item}</span></div>'
-
-        share_text += '<div><span class="text_item">Activate those vocab.</span></div>'
-        data_json["setting"] = {"duration": 500}
-        data_json["notification"] = { "text": share_text }
-        data_json["heading"] = "vocab coverage"
-        data_return = jsonify(data_json)
-
+    df['text'] = df['text'].str.lower()
+    vocab_list_used = {}
+    if len(df_vocab_list) != 0:
+        vocab_list = list(df_vocab_list['value'].str.lower())
     else:
-        data_json = {}
-        share_text = ''
-        share_text += '<div><span class="text_head">vocab.</span></div>'
-        share_text += '<div><span class="text_item">[X]Successive</span></div>'
-        share_text += '<div><span class="text_item">[ ]Following</span></div>'
-        share_text += '<div><span class="text_item">Activate those vocab.</span></div>'
-        data_json["setting"] = {"duration": 500}
-        data_json["notification"] = { "text": share_text }
-        data_json["heading"] = "vocab coverage"
+        if parsed_option_settings is None:
+            vocab_list = ['SAMPLE LIST','successive','following']
+        else:
+            if 'vocab' in parsed_option_settings:
+                vocab_list = parsed_option_settings['vocab']
+            else:
+                vocab_list = ['SAMPLE LIST','successive', 'following']
 
-        data_return = jsonify(data_json)
+    if len(df) != 0:
+        for item in vocab_list:
+            vocab_list_used[item] = df['text'].str.contains(item,case=False).sum()
+    else:
+        for item in vocab_list:
+            vocab_list_used[item] = 0
+
+    data_json = {}
+    share_text = ''
+    share_text += '<div>' \
+                             '<span class="head" style="width:40px;"></span>' \
+                             '<span class="head" style="width:150px;">vocab.</span>' \
+                             '</div>'
+    for item in vocab_list:
+        if vocab_list_used[item] != 0:
+            share_text += f'<div><span class="item" style="width:40px;">[{str(vocab_list_used[item])}]</span>' \
+                                     f'<span class="item_blue">{item}</span></div>'
+        else:
+            share_text += f'<div><span class="item" style="width:40px;">[0]</span>' \
+                                     f'<span class="item_red">{item}</span></div>'
+
+    share_text += '<div><span class="text_item">Activate those vocab.</span></div>'
+    data_json["setting"] = {"duration": 500}
+    data_json["notification"] = { "text": share_text }
+    data_json["heading"] = "vocab coverage"
+    data_return = jsonify(data_json)
 
     return data_return
 
 def get_vocab_frequency(session_string=""):
 
-    df = vocab_calculate_all(session_string=session_string, db_type="past")
-    df_sum = get_stats_for_levels_db(session_string=session_string)
-    vocab_result_save(df=df, db_target_name='vocab_aggregate')
-    df = vocab_result_load(session=session_string)
-    df_freq_session = get_frequently_used_words(session=session_string)
+    # last record needs processing after the session close
+    if session_string == "%":
+        df_freq_session = get_frequently_used_words(session="%")
+    else:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+
+        df_end_max = pd.read_sql("SELECT max(end) FROM caption where " + \
+                                      " session = '" + session_string + "'"
+                                      , conn)
+        conn.commit()
+        conn.close()
+
+        if df_end_max is not None:
+            last_processed_time = pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime()
+            if ((last_processed_time + datetime.timedelta(minutes=2)) < datetime.datetime.now()):
+                print("updated due to max elapsed time")
+                df = vocab_calculate_all(session_string=session_string, since_last_update=True, include_last_record=True)
+                vocab_result_save(df=df, db_target_name="vocab_aggregate")
+
+        df_freq_session = get_frequently_used_words(session=session_string)
+
     df_freq_session = remove_stopwords_entry(df=df_freq_session)
+
+    if len(df_freq_session) == 0:
+        share_text = f"<div>No frequency data for {session_string}</div>"
+        data_show = {"notification": {"text": share_text},
+                     "heading": "Frequency",
+                     "setting":
+                         {"duration": 500}
+                     }
+        data_return = jsonify(data_show)
+
+        return data_return
+
     # df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] > 1) & (df_freq_session['level'] >= "B1")]
     # count(vocab), vocab, start, session, level
-    df_freq_session.sort_values(['level', 'count(vocab)'], ascending=[False, True], inplace=True)
+    df_freq_session.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
     share_text = '<br>'
     share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">'
     share_text += f'<span style="width:120p;display:inline-block" class="head">word</span>' \
                   f'<span style="width:82px;display:inline-block" class="head">level</span>' \
                   f'<span style="width:24px;display:inline-block" class="head">frequency</span>' \
                   f'</div>'
-
-    for index, row in df_freq_session[0:30].iterrows():
+    share_text += '<br><br><br>'
+    #TODO allow config
+    # for index, row in df_freq_session[0:100].iterrows():
+    word_count = df_freq_session['count(vocab)'].sum()
+    df_freq_session_all = df_freq_session.groupby(['level','vocab']).sum()
+    df_freq_session_all = pd.DataFrame(df_freq_session_all.reset_index())
+    df_freq_session_all = df_freq_session_all[df_freq_session_all['count(vocab)'] >= (
+    df_freq_session_all[df_freq_session_all['count(vocab)'] >= 2].mean()['count(vocab)'])]
+    df_speaker_list = df_freq_session.drop_duplicates(subset=['actor'])
+    df_speaker_list_string = "/".join([a for a in df_speaker_list['actor']])
+    share_text += f'<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">all speakers: {df_speaker_list_string} words({str(word_count)})</div>'
+    share_text += '<br><br><br>'
+    df_freq_session_all.sort_values(['level','count(vocab)'],ascending=[False,False], inplace=True)
+    for index, row in df_freq_session_all.iterrows():
         share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
         share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
                       f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}</span>' \
                       f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
         share_text += '</div>'
+
+    for speaker_index, speaker_item in df_speaker_list.iterrows():
+        df_freq_each_speaker =df_freq_session[df_freq_session['actor']==speaker_item['actor']]
+        # df_freq_each_speaker TODO: remove duplicate
+        word_count = df_freq_each_speaker['count(vocab)'].sum()
+        df_freq_each_speaker_group = df_freq_each_speaker.groupby(['level','vocab']).sum()
+        df_freq_each_speaker_group = pd.DataFrame(df_freq_each_speaker_group.reset_index())
+        df_freq_each_speaker = df_freq_each_speaker_group
+        df_freq_each_speaker.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
+        share_text += '<br><br><br>'
+        share_text += f'<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">Speaker:{speaker_item["actor"]} words({str(word_count)})</div>'
+        share_text += '<br><br><br>'
+        for index, row in df_freq_each_speaker.iterrows():
+            share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+            share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
+                          f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}</span>' \
+                          f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
+            share_text += '</div>'
+
+
 
     share_text += "</div>"
     data_show = {"notification": {"text": share_text},
@@ -944,7 +1249,7 @@ def get_turn_taking(session_string=""):
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
-    df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
+    df = pd.read_sql("SELECT * FROM caption_sub where session = '" + session_string + "'", conn)
     if len(df) == 0:
         data_show = {"notification": {"text": f"no data exists for session {session_string}"},
                      "heading": "show stats area",
@@ -952,15 +1257,16 @@ def get_turn_taking(session_string=""):
                          {"duration": 2000}
                      }
         return jsonify(data_show)
-    df.columns = ['id', 'session', 'start', 'end', 'actor', 'text', 'actor_ip']
+    # df.columns = ['id', 'session', 'start', 'end', 'actor', 'text', 'actor_ip']
+    df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text']
     # print("df end",df['end'])
-    df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['substart'] = pd.to_datetime(df['substart'], format="%Y-%m-%d %H:%M:%S.%f")
     df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
-    df['dif'] = df['end'] - df['start']
+    df['dif'] = df['end'] - df['substart']
 
     sum_df = df.groupby('actor').agg({'dif': 'sum'})
     sum_df = pd.DataFrame(sum_df.reset_index())
-    sum_df['dif'] = sum_df['dif'].apply(datetime.timedelta.total_seconds)
+    # sum_df['dif'] = sum_df['dif'].apply(datetime.timedelta.total_seconds)
     sum_df.columns = ['name', 'duration']
     sum_df['share'] = sum_df['duration'] / sum_df['duration'].sum() * 100
     sum_df['share'].fillna(0, inplace=True)
@@ -971,7 +1277,7 @@ def get_turn_taking(session_string=""):
     df_5 = df[df['end'] > last_clocktime]
     sum_df_5 = df_5.groupby('actor').agg({'dif': 'sum'})
     sum_df_5 = pd.DataFrame(sum_df_5.reset_index())
-    sum_df_5['dif'] = sum_df_5['dif'].apply(datetime.timedelta.total_seconds)
+    # sum_df_5['dif'] = sum_df_5['dif'].apply(datetime.timedelta.total_seconds)
     sum_df_5.columns = ['name', 'duration']
     sum_df_5['share_5'] = sum_df_5['duration'] / sum_df_5['duration'].sum() * 100
     sum_df_5['share_5'].fillna(0, inplace=True)
@@ -1032,83 +1338,143 @@ def get_word_per_second(session_string=""):
     df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text']
     df['substart'] = pd.to_datetime(df['substart'], format="%Y-%m-%d %H:%M:%S.%f")
     df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
-    df = df[df['end'] > (df[-1:]['end'] - datetime.timedelta(minutes=3)).values[0]]
+    # TODO: allow config -> auto calibrate through the tempo. May need further customization for each individual
     df['dif'] = df['end'] - df['substart']
     df['word_count'] = df['text'].apply(str.split).apply(len)
 
+    list_actors = [ a[0] for a in df.groupby(["actor"]).groups.items()]
+    df_all = None
+    for each_actor in list_actors:
     # give sufficient length before system recognize part(s) as slower
-    list_df = list(df.values)
-    list_df_merged_for_shorter_segment = []
-    for index, row in enumerate(list_df):
-        if index == 0:
-            list_df_merged_for_shorter_segment.append(row)
-            continue
-        if row[7].microseconds < 1500000 and row[8] <= 2:
-            index_to_merge = len(list_df_merged_for_shorter_segment) - 1
-            if index_to_merge < 0:
-                index_to_merge = 0
-            if list_df_merged_for_shorter_segment[index_to_merge][7].microseconds < 3000000:
-                # add dif and merge text and word count if two captions are adjacent.
-                if list_df_merged_for_shorter_segment[index_to_merge][4] != row[3]:
-                    list_df_merged_for_shorter_segment.append(row)
+    # list_df = list(df.values)
+        index_loop = -1
+        list_df_merged_for_shorter_segment = []
+        for index, row in df.iterrows():
+            if row['actor'] != each_actor:
+                continue
+            index_loop += 1
+            if index_loop == 0:
+                list_df_merged_for_shorter_segment.append(row)
+                continue
+            if (( row['dif'].seconds + row['dif'].microseconds / 1000000 ) < 0.1) and row['word_count'] <= 2:
+                index_to_merge = len(list_df_merged_for_shorter_segment) - 1
+                if index_to_merge < 0:
+                    index_to_merge = 0
+                if list_df_merged_for_shorter_segment[index_to_merge][7].seconds < 3:
+                    # add dif and merge text and word count if two captions are adjacent.
+                    if list_df_merged_for_shorter_segment[index_to_merge][4] != row['start']:
+                        list_df_merged_for_shorter_segment.append(row)
+                    else:
+                        list_df_merged_for_shorter_segment[index_to_merge][4] = row['end']
+                        list_df_merged_for_shorter_segment[index_to_merge][6] = \
+                        list_df_merged_for_shorter_segment[index_to_merge][6] + "/" + row['text']
+                        list_df_merged_for_shorter_segment[index_to_merge][7] = \
+                        list_df_merged_for_shorter_segment[index_to_merge][7] + row['dif']
+                        list_df_merged_for_shorter_segment[index_to_merge][8] = \
+                        list_df_merged_for_shorter_segment[index_to_merge][8] + row['word_count']
                 else:
-                    list_df_merged_for_shorter_segment[index_to_merge][4] = row[4]
-                    list_df_merged_for_shorter_segment[index_to_merge][6] = \
-                    list_df_merged_for_shorter_segment[index_to_merge][6] + "/" + row[6]
-                    list_df_merged_for_shorter_segment[index_to_merge][7] = \
-                    list_df_merged_for_shorter_segment[index_to_merge][7] + row[7]
-                    list_df_merged_for_shorter_segment[index_to_merge][8] = \
-                    list_df_merged_for_shorter_segment[index_to_merge][8] + row[8]
+                    list_df_merged_for_shorter_segment.append(row)
             else:
                 list_df_merged_for_shorter_segment.append(row)
+        if df_all is None:
+            df_all = pd.DataFrame(list_df_merged_for_shorter_segment, columns=df.columns)
         else:
-            list_df_merged_for_shorter_segment.append(row)
-    df = pd.DataFrame(list_df_merged_for_shorter_segment, columns=df.columns)
+            df_temp = pd.DataFrame(list_df_merged_for_shorter_segment, columns=df.columns)
+            df_all = pd.concat([df_all, df_temp])
+    df = df_all.copy()
 
-    df['wps'] = df['word_count'] / (df['dif'].dt.microseconds / 100000)
+    wps_for_each_actor = []
+    df['wps'] = df['word_count'] / (df['dif'].dt.seconds)
     # for mean calculation, it needs sufficient lines of captions
-    if len(df) >= 20:
-        average_wps_all = df['word_count'].sum() / ( df['dif'].dt.microseconds.sum() / 100000 )
-        average_wps_last_set = df['word_count'][0:20:].sum() / ( df['dif'][0:20:].dt.microseconds.sum() / 100000 )
-    else:
-        average_wps_all = df['word_count'].sum() / ( df['dif'].dt.microseconds.sum() / 100000 )
-        average_wps_last_set = df['word_count'][0:20:].sum() / ( df['dif'][0:20:].dt.microseconds.sum() / 100000 )
-        if average_wps_all > 10:
-            average_wps_all = 10         #cap to 10
-        if average_wps_last_set > 10:
-            average_wps_last_set = 10    #cap to 10
+
+    # for each_actor in list_actors:
+    # give sufficient length before system recognize part(s) as slower
+    # list_df = list(df.values)
+    df_average_all = (df.groupby(["actor"])['word_count'].sum() / df.groupby(["actor"])['dif'].sum().dt.seconds).reset_index()
+    df_average_all.columns = ['actor','wps']
+    df_average_20 = pd.DataFrame([[ids[0],  (df.iloc[ ids[1],df.columns.get_loc("word_count") ][0:20].sum()) / (df.iloc[ ids[1],df.columns.get_loc("dif") ][0:20].sum().seconds)   ] for ids in df.groupby(["actor"]).groups.items()], columns=['actor','wps'])
+    df_average_all[df_average_all['wps'] > 10]['wps'] = 10
+    df_average_20[df_average_20['wps'] > 10]['wps'] = 10
+
+    # if len(df) >= 20:
+    #     average_wps_all = df['word_count'].sum() / ( df['dif'].dt.microseconds.sum() / 100000 )
+    #     average_wps_last_set = df['word_count'][0:20:].sum() / ( df['dif'][0:20:].dt.microseconds.sum() / 100000 )
+    # else:
+    #     average_wps_all = df['word_count'].sum() / ( df['dif'].dt.microseconds.sum() / 100000 )
+    #     average_wps_last_set = df['word_count'][0:20:].sum() / ( df['dif'][0:20:].dt.microseconds.sum() / 100000 )
+    #     if average_wps_all > 10:
+    #         average_wps_all = 10         #cap to 10
+    #     if average_wps_last_set > 10:
+    #         average_wps_last_set = 10    #cap to 10
 
     df['wps'].fillna(0, inplace=True)
+    df.loc[df[df['wps'] > 10].index, 'wps'] = 12
     df.sort_values(['substart'], ascending=[False], inplace=True)
-    threshold_wps = average_wps_last_set * 0.8
-    share_text = f'<div>Average WPS (all): {format(average_wps_all,".2f")}<br>' + \
-                 f'Average WPS (20): {format(average_wps_last_set, ".2f")}<br>' + \
-                 f'from {df[:1]["substart"].dt.strftime("%H:%m:%S").values[0]} <br>' + \
-                 f'Threshold WPS: {format(threshold_wps, ".2f")}' + \
-                 f'</div>'
+
+    df_wps_line = pd.DataFrame([[a[0][1]['actor'], a[0][1]['wps'], a[1][1]['wps']] for a in
+                  zip(df_average_all.iterrows(), df_average_20.iterrows())], columns=['actor', 'wps_all', 'wps_20'])
+    share_text = '<div>'
+    share_text += f'<span style="width:64px;font-size:12px;" class="head">Speaker</span>' \
+                  f'<span style="width:24px;font-size:12px;" class="head">wps(all)</span>' \
+                  f'<span style="width:24px;font-size:12px;"  class="head">wps(20 items)</span>' \
+                  f'<span style="width:50px;font-size:12px;"  class="head">wps target</span>' + \
+                  '</div>'
+    for index, row in df_wps_line.iterrows():
+        threshold_wps = row['wps_20'] * 0.8
+        share_text += f'<div>' + \
+                      f'<span style="width:64px;font-size:12px;" class="item">{row["actor"]}</span>' + \
+                      f'<span style="width:24px;font-size:12px;" class="item">{format( row["wps_all"],".2f")}</span>' + \
+                      f'<span style="width:24px;font-size:12px;" class="item">{format(row["wps_20"], ".2f")}</span>' + \
+                      f'<span style="width:50px;font-size:12px;" class="item">{format(threshold_wps, ".2f")}</span>' + \
+                      f'</div>'
+                     # f'from {df[:1]["substart"].dt.strftime("%H:%m:%S").values[0]} <br>' + \
     share_text += '<div style="font-size:24px;">'
     share_text += f'<span style="width:64px;font-size:12px;" class="head">clock</span>' \
                   f'<span style="width:24px;font-size:12px;" class="head">sec</span>' \
                   f'<span style="width:24px;font-size:12px;"  class="head">words</span>' \
-                  f'<span style="width:50px;font-size:12px;"  class="head">wps.</span>' \
-                  f'<span style="width:100px;font-size:12px;"  class="head">text</span>' \
+                  f'<span style="width:50px;font-size:12px;"  class="head">wps.</span>'
+    #TODO allow config
+    is_to_display_speaker_only = False
+    if is_to_display_speaker_only == True:
+        is_to_display_speaker_only = True
+    else:
+        share_text += f'<span style="width:100px;font-size:12px;"  class="head">Speaker</span>'
+    share_text += f'<span style="width:100px;font-size:12px;"  class="head">text</span>' \
                   f'</div>'
-    for index, row in df[0:20:].iterrows():
+    # for index, row in df[0:20:].iterrows():
+    # if len(df[(df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1]['dif']) != 0:
+    #     update_index = (df['wps'] == np.inf )
+    #     # update_index = ((df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1)
+    #     # df[(df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1]['dif'] = pd.Series(
+    #     #     [0.1 for a in range(0, len(df[(df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1]), 1)])
+    #     # df_existing.iloc[df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')] = pd.Series(
+    #     #     row['end'])
+    #     # df.iloc[df[update_index].index, df.columns.get_loc('dif')] = pd.Series([ datetime.timedelta(milliseconds=100) for a in range(0, len(df[(df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1]), 1)])
+    #     df.iloc[df[update_index].index, df.columns.get_loc('wps')] = pd.Series( [ 1 for a in range(0,len(df[update_index]),1)]  )
+    for index, row in df.iterrows():
         share_text += '<div style="font-size:12px;">'
         share_text += f'<span style="width:64px;font-size:12px;" class="item">{row["substart"].strftime("%M:%S")}</span>' \
-                      f'<span style="width:24px;font-size:12px;" class="item">{format(row["dif"].microseconds / 100000,".1f")}</span>' \
+                      f'<span style="width:24px;font-size:12px;" class="item">{format((row["dif"].seconds +row["dif"].microseconds / 1000000 )  ,".1f")}</span>' \
                       f'<span style="width:24px;font-size:12px;" class="item">{row["word_count"]}</span>'
         item_fontsize = "12"
         if row["wps"] < ( threshold_wps ):
             item_type = "item_red"
-            item_fontsize = "12"
+            item_fontsize = "24"
         elif row["wps"] < 1:
             item_type = "item_red"
-            item_fontsize = "24"
+            item_fontsize = "12"
         else:
-            item_type = "item"
+            item_type = "item_blue"
+        # if row['wps'] > 10:
+        #     row['wps'] = 10
         share_text += f'<span style="width:50px;font-size:{item_fontsize}px;" class="{item_type}">{format(row["wps"], ".2f")}</span>'
-        share_text += f'<span style="width:100px;font-size:12px;" class="{item_type}">{str.lower(row["text"][0:26])}</span>'
+        # share_text += f'<span style="width:100px;font-size:12px;" class="{item_type}">{str.lower(row["text"][0:26])}</span>'
+        # TODO allow config
+        if is_to_display_speaker_only == True:
+            is_to_display_speaker_only = True
+        else:
+            share_text += f'<span style="width:100px;font-size:12px;"  class="head">{row["actor"]}</span>'
+        share_text += f'<span style="width:70%;font-size:12px;" class="{item_type}">{str.lower(row["text"])}</span>'
         share_text += '</div>'
     # print(share_text)
     data = {"notification": {"text":share_text},
@@ -1175,6 +1541,13 @@ def create_db():
         'actor VARCHAR(30),'
         'text MESSAGE_TEXT,'
         'logtype MESSAGE_TEXT )')
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS session_settings('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'session VARHAR(40),'
+        'actor VARCHAR(30),'
+        'key VARCHAR(20),'
+        'value MESSAGE_TEXT )')
     conn.commit()
     conn.close()
 

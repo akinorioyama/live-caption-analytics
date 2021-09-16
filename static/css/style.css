@@ -51,13 +51,17 @@
     .item {
         color : #FFFFFF;
         font-size : 12px;
+        /*line-height: 12px;*/
         z-index: 101;
+        /*width:100px;*/
         display:inline-block;
     }
     .head {
         color : #FFFFFF;
+        /*line-height: 24px;*/
         font-size : 24px;
         z-index: 101;
+        /*width:100px;*/
         display:inline-block;
     }
 
@@ -89,6 +93,17 @@
         display:inline-block;
     }
 
+    #speava_caption_container > div {
+        /*display: flex !important;*/
+        /*flex-flow: column;*/
+        /*flex-direction: column !important;*/
+        /*position : absolute !important;*/
+        /*left : 300px !important;*/
+        /*top : 144px !important;*/
+        /*size : 150px !important;*/
+
+    }
+
     #speava_caption_container  {
         display: flex !important;
         flex-flow: column;
@@ -96,6 +111,8 @@
         position : absolute !important;
         left : 300px !important;
         top : 144px !important;
+        /*size : 150px !important;*/
+
     }
 
     .repeat_flash {
@@ -113,13 +130,4 @@
             color: indianred;
         }
 
-    }
-
-    .speava_button {
-        border-radius: 10px;
-        line-height: 2.5;
-    }
-
-    .speava_button_active {
-        background-color: #ac2925;
     }

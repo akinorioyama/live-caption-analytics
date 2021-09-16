@@ -6,13 +6,17 @@
     "js": "options.js"
   },
   "description": "Provide routes to send live captions to analytics servers.",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "icons": {
     "128": "icons/icon.png"
   },
   "content_scripts": [{
     "matches": ["https://meet.google.com/*",
-                "https://*.zoom.us/wc/*"],
+                "https://*.zoom.us/wc/*",
+                "http://localhost/lca/*",
+                "https://*.rarejob.com/*",
+                "https://eikaiwa.dmm.com/*"
+    ],
     "js": ["inject.js"],
     "css": ["css/style.css"],
     "run_at": "document_idle",
@@ -22,8 +26,11 @@
     "storage"
   ],
   "host_permissions": [
-    "http://meet.google.com/",
-    "https://*.zoom.us/"
+    "https://meet.google.com/*",
+    "https://*.zoom.us/",
+    "http://localhost/lca/*",
+    "https://*.rarejob.com/*",
+    "https://eikaiwa.dmm.com/*"
   ],
   "web_accessible_resources": [
     {
@@ -33,7 +40,11 @@
         "icons/icon_config.png","icons/icon_delete.png","icons/icon_circle.png","icons/icon_record.png","icons/icon_log.png",
         "css/style.css"],
       "matches": [ "https://meet.google.com/*",
-      "https://*.zoom.us/*"]
+                   "https://*.zoom.us/*",
+                   "http://localhost/*",
+                   "https://*.rarejob.com/*",
+                   "https://eikaiwa.dmm.com/*"
+        ]
     }
   ],
   "manifest_version": 3,

@@ -10,7 +10,7 @@ def log_load(session = "", start:datetime=None):
     if session is not None:
         kwargs['session'] = [session,"="]
     if start is not None:
-        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S"),">="]
+        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S.%f"),">="]
     if len(kwargs) == 0:
         where_clause = ""
     else:
@@ -50,7 +50,7 @@ def session_load(session = "", start:datetime=None):
     if session is not None:
         kwargs['session'] = [session,"="]
     if start is not None:
-        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S"),">="]
+        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S.%f"),">="]
     if len(kwargs) == 0:
         where_clause = ""
     else:

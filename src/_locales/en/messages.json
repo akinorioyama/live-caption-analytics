@@ -46,5 +46,20 @@
         "placeholders": {
           "word": { "content": "$1" }
         }
+    },
+    "alart_to_ask_to_answer_the_prompt":
+    {
+        "message" : "Select an option to answer the question"
+    },
+    "prompt_no_answer": {
+        "message" : "You didn't select any option."
+    },
+    "prompt_for_an_option" :
+    {
+        "message" : "Option $word$ is selected",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
     }
+
 }

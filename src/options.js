@@ -9,6 +9,7 @@ function save_options() {
   var speava_session_show = document.getElementById('speava_session_show').checked;
   var speava_session_notification = document.getElementById('speava_session_notification_option').checked;
   var speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
+  var speava_session_prompt = document.getElementById('speava_session_prompt').checked;
   var speava_session_option_string = document.getElementById('speava_session_option_string').value;
   chrome.storage.sync.set({
     speava_session_record: speava_session_record,
@@ -20,6 +21,7 @@ function save_options() {
     speava_session_show : speava_session_show,
     speava_session_notification : speava_session_notification,
     speava_session_unrecognized : speava_session_unrecognized,
+    speava_session_prompt : speava_session_prompt,
     speava_session_option_string: speava_session_option_string
   }, function() {
     // Update status to let user know options were saved.
@@ -45,7 +47,8 @@ function restore_options() {
     speava_session_show: false,
     speava_session_notification: false,
     speava_session_unrecognized: false,
-    speava_session_option_string: null
+    speava_session_prompt: false,
+    speava_session_option_string: ""
   }, function(items) {
     document.getElementById('speava_session_record').value = items.speava_session_record;
     document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -56,6 +59,7 @@ function restore_options() {
     document.getElementById('speava_session_show').checked = items.speava_session_show;
     document.getElementById('speava_session_notification_option').checked = items.speava_session_notification;
     document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
+    document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
     document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
   });
 }

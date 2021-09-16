@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Extract vocab from a page</title>
+</head>
+<body>
+<b>URL:</b><br> {{url}}
+<br>
+<b>Vocab options:</b><br>
+{{vocab_string}}
+<table>
+    <tr><td><b>C1 or Above</b></td></tr>
+{% for index, item in df_list_c1.iterrows(): %}
+    <tr>
+        <td>{{item['vocab']}}</td>
+        <td>{{ item['level'] }}</td>
+    </tr>
+{% endfor %}
+    <tr><td><b>B1 or Above</b></td></tr>
+{% for index, item in df_list_b1.iterrows(): %}
+    <tr>
+        <td>{{item['vocab']}}</td>
+        <td>{{ item['level'] }}</td>
+    </tr>
+{% endfor %}
+    <tr><td><b>all (up to 50)</b></td></tr>
+
+{% for index, item in df_list_all.iterrows(): %}
+    <tr>
+        <td>{{item['vocab']}}</td>
+        <td>{{ item['level'] }}</td>
+    </tr>
+{% endfor %}
+</table>
+
+</body>
+</html>

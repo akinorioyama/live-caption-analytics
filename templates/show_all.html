@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <title>All results</title>
+</head>
+<body style="background-color: #a9a9a9;">
+
+{% autoescape false %}
+{% for item in data: %}
+    <div>{{item['notification']['text']}}</div>
+<br>
+
+{% endfor %}
+{% endautoescape %}
+
+
+</body>
+</html>

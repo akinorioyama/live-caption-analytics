@@ -1,17 +1,3 @@
-
-try {
-
-  const node_head = document.getElementsByTagName('head')[0];
-
-  const css_file = document.createElement('style');
-  // css_file.setAttribute('id', "test");
-  css_file.setAttribute('type', "text/css");
-  const url_css_file = chrome.runtime.getURL("css/style.css");
-  css_file.setAttribute('src', url_css_file);
-  node_head.appendChild(css_file);
-
-  // https://stackoverflow.com/questions/46613243/uncaught-syntaxerror-unexpected-token-u-in-json-at-position-0
-  // localStorage.clear()
 try {
 
 ;(() => {
@@ -19,6 +5,11 @@ try {
   // Variables
   ////////////////////////////////////////////////////////////////////////////
 
+  const chrome_runtime_getURL = (url) => {
+    const new_url = "/static/" + url;
+    return new_url;
+    }
+  let speava_session_id = null;
   // DOM node where Google Meet puts its closed captions
   let captionsContainer  = null;
 
@@ -296,9 +287,26 @@ try {
   // -------------------------------------------------------------------------
   const getAllStorageSyncData = () => {
     // Immediately return a promise and start asynchronous work
+
+    speava_session_id= localStorage.getItem('speava_session_id');
+    speava_session_record= localStorage.getItem('speava_session_record');
+    speava_session_spreadsheet_post = localStorage.getItem('speava_session_spreadsheet_post');
+    speava_session_username = localStorage.getItem('speava_session_username');
+    speava_session_log_string = localStorage.getItem('speava_session_log_string');
+    speava_session_send_rawed = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
+    speava_session_post = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
+    speava_session_show = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
+    speava_session_notification = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
+    speava_session_unrecognized = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
+    speava_session_prompt = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
+    speava_session_option_string = localStorage.getItem('speava_session_option_string');
+
+    speava_server_url_to_record = speava_session_record
+    currentTranscriptId = speava_session_id;
+    return;
     return new Promise((resolve) => {
       // Asynchronously fetch all data from storage.sync.
-      chrome.storage.sync.get({
+      window.localStorage.get({
       speava_session_record: 'enter URL',
       speava_session_spreadsheet_post: 'enter URL',
       speava_session_username: 'Default user',
@@ -340,7 +348,7 @@ try {
   // -------------------------------------------------------------------------
   // sync settings from storage.sync
   // -------------------------------------------------------------------------
-    chrome.storage.sync.get({
+    chrome.storage.local.get({
       speava_session_record: 'enter URL',
       speava_session_spreadsheet_post: 'enter URL',
       speava_session_username: 'Default user',
@@ -1129,7 +1137,7 @@ try {
       let prompt_text = json_text.prompt_options;
       const time_length = json_text.setting.duration;
       dialog.id = "option_prompt_dialog"
-      const msg_text = chrome.i18n.getMessage('alart_to_ask_to_answer_the_prompt');
+      const msg_text = "chrome.i18n.getMessage('alart_to_ask_to_answer_the_prompt')";
       inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}<br></div>`;
       inner_text += `<div  style="display:inline; font-size:48px;">${heading}<br></div>`
       item_texts = prompt_text.split(",");
@@ -1152,7 +1160,7 @@ try {
         setTimeout( function() {dialog.remove();}, 1000);
       } else {
         setTimeout( function() {
-          const message_text = chrome.i18n.getMessage("prompt_no_answer");
+          const message_text = 'chrome.i18n.getMessage("prompt_no_answer")';
           if_dialog_exist = document.getElementById('option_prompt_dialog');
           if (if_dialog_exist){
             toast_to_notify('<div style="font-size:24px;">' +
@@ -1164,7 +1172,7 @@ try {
       }
       for (let new_counter = 0; new_counter < counter ;new_counter++) {
         document.getElementById(`prompttext${new_counter}`).addEventListener('click', e => {
-          const message_text = chrome.i18n.getMessage("prompt_for_an_option",e.target.innerText);
+          const message_text = 'chrome.i18n.getMessage("prompt_for_an_option",e.target.innerText)';
           toast_to_notify('<div style="font-size:24px;">' +
               message_text +
               '</div>',2000);
@@ -1253,10 +1261,10 @@ try {
             let counter = 0;
             let inner_text = "";
             if (prompt_text.length === 0){
-              const msg_text = chrome.i18n.getMessage('alart_to_notify_no_pending_transcript');
+              const msg_text = "chrome.i18n.getMessage('alart_to_notify_no_pending_transcript')";
               inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
             } else {
-              const msg_text = chrome.i18n.getMessage('alart_to_notify_pending_transcript');
+              const msg_text = "chrome.i18n.getMessage('alart_to_notify_pending_transcript')";
               inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
             }
             for (let item of prompt_text){
@@ -1293,7 +1301,7 @@ try {
             for (let new_counter = 0; new_counter < counter ;new_counter++) {
               document.getElementById(`hinttext${new_counter}`).addEventListener('click', e => {
                 // TODO: startAt may suit better for the logging purpose as it captures the begining of the caption line
-                const message_text = chrome.i18n.getMessage("record_to_review",e.target.innerText);
+                const message_text = 'chrome.i18n.getMessage("record_to_review",e.target.innerText)';
                 toast_to_notify('<div style="font-size:24px;">' +
                     message_text +
                     '</div>',1500);
@@ -1341,11 +1349,13 @@ try {
 
 
   const open_option_dialog = () => {
-    if (chrome.runtime.openOptionsPage) {
+    // if (chrome.runtime.openOptionsPage) {
+    //   chrome.runtime.openOptionsPage();
+    if (null) {
       chrome.runtime.openOptionsPage();
     } else {
       let dialog = document.createElement('dialog');
-      let request = new Request(chrome.runtime.getURL('options.html'));
+      let request = new Request(chrome_runtime_getURL('options.html'));
       fetch(request).then( function(response){
         return response.text().then( function(text) {
           dialog.innerHTML = text;
@@ -1356,9 +1366,9 @@ try {
 
           // Saves options to chrome.storage
           const save_options = () => {
-            var speava_session_record = document.getElementById('speava_session_record').value;
-            var speava_session_spreadsheet_post = document.getElementById('speava_session_spreadsheet_post').value;
-            var speava_session_username = document.getElementById('speava_session_username').value;
+            speava_session_record = document.getElementById('speava_session_record').value;
+            speava_session_spreadsheet_post = document.getElementById('speava_session_spreadsheet_post').value;
+            speava_session_username = document.getElementById('speava_session_username').value;
             speava_session_log_string = document.getElementById('speava_session_log_string').value;
             speava_session_send_raw = document.getElementById('speava_session_send_raw').checked;
             speava_session_post = document.getElementById('speava_session_post').checked;
@@ -1367,66 +1377,103 @@ try {
             speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
             speava_session_prompt = document.getElementById('speava_session_prompt').checked;
             speava_session_option_string = document.getElementById('speava_session_option_string').value;
-
+            speava_session_id = document.getElementById('speava_session_id').value;
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
             speava_server_username = speava_session_username;
+            currentTranscriptId = speava_session_id;
+
+            localStorage.setItem('speava_session_record',speava_session_record);
+            localStorage.setItem('speava_session_spreadsheet_post',speava_session_spreadsheet_post);
+            localStorage.setItem('speava_session_username',speava_session_username);
+            localStorage.setItem('speava_session_log_string',speava_session_log_string);
+            localStorage.setItem('speava_session_send_raw',speava_session_send_raw);
+            localStorage.setItem('speava_session_post',speava_session_post);
+            localStorage.setItem('speava_session_show',speava_session_show);
+            localStorage.setItem('speava_session_notification',speava_session_notification);
+            localStorage.setItem('speava_session_unrecognized',speava_session_unrecognized);
+            localStorage.setItem('speava_session_prompt',speava_session_prompt);
+            localStorage.setItem('speava_session_option_string',speava_session_option_string);
+            localStorage.setItem('speava_session_id',speava_session_id);
+
             let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
             SPEAKER_NAME_MAP = obj;
-            chrome.storage.sync.set({
-              speava_session_record: speava_session_record,
-              speava_session_spreadsheet_post: speava_session_spreadsheet_post,
-              speava_session_username:speava_session_username,
-              speava_session_log_string : speava_session_log_string,
-              speava_session_send_raw : speava_session_send_raw,
-              speava_session_post : speava_session_post,
-              speava_session_show : speava_session_show,
-              speava_session_notification : speava_session_notification,
-              speava_session_unrecognized : speava_session_unrecognized,
-              speava_session_prompt : speava_session_prompt,
-              speava_session_option_string: speava_session_option_string
-            }, function() {
-              // Update status to let user know options were saved.
-              let optional_buttons = document.getElementById('optional_buttons');
-              while (optional_buttons.firstChild){
-                optional_buttons.removeChild(optional_buttons.firstChild);
-              }
-              add_option_buttons(optional_buttons);
+            // chrome.storage.local.set({
+            //   speava_session_record: speava_session_record,
+            //   speava_session_spreadsheet_post: speava_session_spreadsheet_post,
+            //   speava_session_username:speava_session_username,
+            //   speava_session_log_string : speava_session_log_string,
+            //   speava_session_send_raw : speava_session_send_raw,
+            //   speava_session_post : speava_session_post,
+            //   speava_session_show : speava_session_show,
+            //   speava_session_notification : speava_session_notification,
+            //   speava_session_unrecognized : speava_session_unrecognized,
+            //   speava_session_prompt : speava_session_prompt,
+            //   speava_session_option_string: speava_session_option_string
+            // }, function() {
+            //   // Update status to let user know options were saved.
+            //   let optional_buttons = document.getElementById('optional_buttons');
+            //   while (optional_buttons.firstChild){
+            //     optional_buttons.removeChild(optional_buttons.firstChild);
+            //   }
+            //   add_option_buttons(optional_buttons);
+            //   var status = document.getElementById('status');
+            //   status.textContent = 'Options saved.';
+            //   setTimeout(function() {
+            //     status.textContent = '';
+            //     dialog.remove();
+            //   }, 750);
+            // });
+            //   add_option_buttons(optional_buttons);
               var status = document.getElementById('status');
               status.textContent = 'Options saved.';
               setTimeout(function() {
                 status.textContent = '';
                 dialog.remove();
               }, 750);
-            });
+
           }
 
           const restore_options = () => {
-            chrome.storage.sync.get({
-              speava_session_record: 'enter URL',
-              speava_session_spreadsheet_post: 'enter URL',
-              speava_session_username: 'Default user',
-              speava_session_log_string: 'Wonder,Mistakes',
-              speava_session_send_raw: false,
-              speava_session_post: false,
-              speava_session_show: false,
-              speava_session_notification: false,
-              speava_session_unrecognized: false,
-              speava_session_prompt: false,
-              speava_session_option_string: ""
-            }, function(items) {
-              document.getElementById('speava_session_record').value = items.speava_session_record;
-              document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
-              document.getElementById('speava_session_username').value = items.speava_session_username;
-              document.getElementById('speava_session_log_string').value = items.speava_session_log_string;
-              document.getElementById('speava_session_send_raw').checked = items.speava_session_send_raw;
-              document.getElementById('speava_session_post').checked = items.speava_session_post;
-              document.getElementById('speava_session_show').checked = items.speava_session_show;
-              document.getElementById('speava_session_notification_option').checked = items.speava_session_notification;
-              document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
-              document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
-              document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
-            });
+            // chrome.storage.local.get({
+            //   speava_session_record: 'enter URL',
+            //   speava_session_spreadsheet_post: 'enter URL',
+            //   speava_session_username: 'Default user',
+            //   speava_session_log_string: 'Wonder,Mistakes',
+            //   speava_session_send_raw: false,
+            //   speava_session_post: false,
+            //   speava_session_show: false,
+            //   speava_session_notification: false,
+            //   speava_session_unrecognized: false,
+            //   speava_session_prompt: false,
+            //   speava_session_option_string: ""
+            // }, function(items) {
+            //   document.getElementById('speava_session_record').value = items.speava_session_record;
+            //   document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
+            //   document.getElementById('speava_session_username').value = items.speava_session_username;
+            //   document.getElementById('speava_session_log_string').value = items.speava_session_log_string;
+            //   document.getElementById('speava_session_send_raw').checked = items.speava_session_send_raw;
+            //   document.getElementById('speava_session_post').checked = items.speava_session_post;
+            //   document.getElementById('speava_session_show').checked = items.speava_session_show;
+            //   document.getElementById('speava_session_notification_option').checked = items.speava_session_notification;
+            //   document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
+            //   document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
+            //   document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
+            // });
+              document.getElementById('speava_session_id').value = localStorage.getItem('speava_session_id');
+              document.getElementById('speava_session_record').value = localStorage.getItem('speava_session_record');
+              document.getElementById('speava_session_spreadsheet_post').value = localStorage.getItem('speava_session_spreadsheet_post');
+              document.getElementById('speava_session_username').value = localStorage.getItem('speava_session_username');
+              document.getElementById('speava_session_log_string').value = localStorage.getItem('speava_session_log_string');
+              document.getElementById('speava_session_send_raw').checked = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
+              document.getElementById('speava_session_post').checked = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
+              document.getElementById('speava_session_show').checked = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
+              document.getElementById('speava_session_notification_option').checked = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
+              document.getElementById('speava_session_unrecognized').checked = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
+              document.getElementById('speava_session_prompt').checked = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
+              document.getElementById('speava_session_option_string').value = localStorage.getItem('speava_session_option_string');
+            // });
+
           }
           document.body.appendChild(dialog);
           dialog.showModal();
@@ -1490,7 +1537,7 @@ try {
       const element_caption_reaction = document.getElementById("speava_caption_reaction");
 
       if (!speava_session_unrecognized) {
-        const msg_text = chrome.i18n.getMessage('realtime_caption_notify_the_option');
+        const msg_text = "chrome.i18n.getMessage('realtime_caption_notify_the_option')";
         element_caption_reaction.innerHTML = msg_text;
 
       } else {
@@ -1499,10 +1546,10 @@ try {
         let counter = 0;
         let inner_text = "";
         if (prompt_text.length === 0) {
-          const msg_text = chrome.i18n.getMessage('realtime_no_caption_to_send_to_log');
+          const msg_text = "chrome.i18n.getMessage('realtime_no_caption_to_send_to_log')";
           inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
         } else {
-          const msg_text = chrome.i18n.getMessage('realtime_caption_to_send_to_log');
+          const msg_text = "chrome.i18n.getMessage('realtime_caption_to_send_to_log')";
           inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
         }
         for (let item of prompt_text) {
@@ -1523,7 +1570,7 @@ try {
         for (let new_counter = 0; new_counter < counter; new_counter++) {
           document.getElementById(`hinttext_caption_reaction${new_counter}`).addEventListener('click', e => {
             // TODO: startAt may suit better for the logging purpose as it captures the begining of the caption line
-            const message_text = chrome.i18n.getMessage("record_unrecognized", e.target.innerText);
+            const message_text = 'chrome.i18n.getMessage("record_unrecognized", e.target.innerText)';
             toast_to_notify('<div style="font-size:24px;">' +
                 message_text +
                 '</div>', 1500);
@@ -1564,11 +1611,11 @@ try {
 
       if (!speava_session_notification) {
         let notification_area = document.getElementById("speava_session_notification");
-        notification_area.innerHTML = chrome.i18n.getMessage("show_option_feedback");
+        notification_area.innerHTML = 'chrome.i18n.getMessage("show_option_feedback")';
       }
       if (!speava_session_show){
         const feedback_textarea = document.getElementById("speava_textarea");
-        feedback_textarea.innerHTML = chrome.i18n.getMessage("show_stats_option");
+        feedback_textarea.innerHTML = 'chrome.i18n.getMessage("show_stats_option")';
       } else {
         if (speava_async_response_show === null || speava_async_response_show === undefined) {
           if (isShowing === true) {
@@ -1665,9 +1712,9 @@ try {
   //   removing past captions due to unrecognized text pane
   // -------------------------------------------------------------------------
   const addButtons = () => {
-    if (is_synced === null){
-      return;
-    }
+    // if (is_synced === null){
+    //   return;
+    // }
     if (isTextAreaCreated === null) {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
@@ -1828,10 +1875,10 @@ try {
 
       const clearTranscript = () => deleteTranscript(currentTranscriptId);
 
-      const url_icon_config = chrome.runtime.getURL("icons/icon_config.png");
-      const url_icon_delete = chrome.runtime.getURL("icons/icon_delete.png");
-      const url_icon_record = chrome.runtime.getURL("icons/icon_record.png");
-      const url_icon_log = chrome.runtime.getURL("icons/icon_log.png");
+      const url_icon_config = chrome_runtime_getURL("icons/icon_config.png");
+      const url_icon_delete = chrome_runtime_getURL("icons/icon_delete.png");
+      const url_icon_record = chrome_runtime_getURL("icons/icon_record.png");
+      const url_icon_log = chrome_runtime_getURL("icons/icon_log.png");
 
       const reactionFocus_log_action = () => log_action(currentTranscriptId);
       const open_options = () => open_option_dialog();
@@ -1913,7 +1960,7 @@ try {
         log_record_type_obj.setAttribute('class',"speava_button");
         log_record_type_obj.addEventListener('click', e => {
           const clicked_button_text = e.target.innerText;
-          const message_text = chrome.i18n.getMessage("record_log",e.target.innerText);
+          const message_text = 'chrome.i18n.getMessage("record_log",e.target.innerText)';
           toast_to_notify('<div style="font-size:24px;">' + message_text +
                           '</div>',1500);
           fire_log("no text",clicked_button_text);
@@ -1964,7 +2011,7 @@ try {
       cc_button_path = `//button[contains(@aria-label,"captions (c)")]`;
       const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
       if ( pathString === null || pathString[2] !== "en") {
-        const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
+        const msg_string = 'chrome.i18n.getMessage("alert_to_change_lanauge")';
         window.alert(msg_string);
       }
     } else if (hostname.match("zoom") !== null){
@@ -2023,8 +2070,8 @@ try {
   is_synced = null;
 
   getAllStorageSyncData();
-  cleanupOnstartupForAccumulatedTranscripts();
-  setCurrentTranscriptDetails();
+  // cleanupOnstartupForAccumulatedTranscripts();
+  // setCurrentTranscriptDetails();
   setInterval(tryTo(addButtons, 'adding buttons'), 500);
   setInterval(tryTo(addButtonLoop, 'adding button'), 500);
   setInterval(sendData,500);
@@ -2037,23 +2084,17 @@ try {
   ////////////////////////////////////////////////////////////////////////////
 
   // Add stylesheet to DOM
-  const STYLE = document.createElement('style')
-  const url_icon_circle = chrome.runtime.getURL("icons/icon_circle.png");
-  STYLE.innerText = `#__gmla-icon.on { background-image: url("${url_icon_circle}");
-                                      background-size: 36px;
-                                      opacity: 0.5;
-                                      z-index: 99;
-                                      width:36px;
-                                      height:36px;}  `
-  document.head.append(STYLE);
+  // const STYLE = document.createElement('style')
+  // const url_icon_circle = chrome_runtime_getURL("icons/icon_circle.png");
+  // STYLE.innerText = `#__gmla-icon.on { background-image: url("${url_icon_circle}");
+  //                                     background-size: 36px;
+  //                                     opacity: 0.5;
+  //                                     z-index: 99;
+  //                                     width:36px;
+  //                                     height:36px;}  `
+  // document.head.append(STYLE);
 })();
 
 } catch (e) {
   console.error('init error', e);
-}
-
-
-
-} catch (e) {
-  console.log('error injecting script', e);
 }

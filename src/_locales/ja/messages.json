@@ -44,5 +44,19 @@
         "placeholders": {
           "word": { "content": "$1" }
         }
+    },
+    "alart_to_ask_to_answer_the_prompt":
+    {
+        "message" : "選択肢をクリックして選んでください"
+    },
+    "prompt_no_answer": {
+        "message" : "選択肢を選んで回答しませんでした"
+    },
+    "prompt_for_an_option" :
+    {
+        "message" : "「$word$」を選んで回答しました",
+        "placeholders": {
+          "word": { "content": "$1" }
+        }
     }
 }
