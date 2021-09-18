@@ -1384,7 +1384,7 @@ def get_word_per_second(session_string=""):
     df = df_all.copy()
 
     wps_for_each_actor = []
-    df['wps'] = df['word_count'] / (df['dif'].dt.seconds)
+    df['wps'] = df['word_count'] / (df['dif'].dt.seconds +  df["dif"].dt.microseconds / 1000000 )
     # for mean calculation, it needs sufficient lines of captions
 
     # for each_actor in list_actors:
