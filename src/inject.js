@@ -111,6 +111,7 @@ try {
   let speava_session_unrecognized;
   let speava_session_prompt;
   let speava_session_option_string;
+  let speava_session_window_positions;
 
   const hostname_for_adhoc = document.location.hostname;
 
@@ -309,7 +310,8 @@ try {
       speava_session_notification: false,
       speava_session_unrecognized: false,
       speava_session_prompt: false,
-      speava_session_option_string: null
+      speava_session_option_string: null,
+      speava_session_window_positions: null
     }, (items) => {
         // resolve(is_synced = true);
         is_synced = true
@@ -329,7 +331,7 @@ try {
         speava_session_unrecognized =         items.speava_session_unrecognized
         speava_session_prompt =               items.speava_session_prompt;
         speava_session_option_string =        items.speava_session_option_string;
-
+        speava_session_window_positions =     items.speava_session_window_positions;
         let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
         SPEAKER_NAME_MAP = obj;
 
@@ -351,7 +353,8 @@ try {
       speava_session_notification: false,
       speava_session_unrecognized: false,
       speava_session_prompt: false,
-      speava_session_option_string: ""
+      speava_session_option_string: "",
+      speava_session_window_positions: ""
     }, function(items) {
       speava_server_url_to_record = items.speava_session_record;
       speava_server_url_to_post = items.speava_session_spreadsheet_post;
@@ -364,7 +367,7 @@ try {
       speava_session_unrecognized =         items.speava_session_unrecognized
       speava_session_prompt =               items.speava_session_prompt;
       speava_session_option_string =        items.speava_session_option_string;
-
+      speava_session_window_positions =     items.speava_session_window_positions;
       let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
       SPEAKER_NAME_MAP = obj;
     });
@@ -1367,6 +1370,7 @@ try {
             speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
             speava_session_prompt = document.getElementById('speava_session_prompt').checked;
             speava_session_option_string = document.getElementById('speava_session_option_string').value;
+            speava_session_window_positions = document.getElementById('speava_session_window_positions').value;
 
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
@@ -1384,7 +1388,8 @@ try {
               speava_session_notification : speava_session_notification,
               speava_session_unrecognized : speava_session_unrecognized,
               speava_session_prompt : speava_session_prompt,
-              speava_session_option_string: speava_session_option_string
+              speava_session_option_string: speava_session_option_string,
+              speava_session_window_positions: speava_session_window_positions
             }, function() {
               // Update status to let user know options were saved.
               let optional_buttons = document.getElementById('optional_buttons');
@@ -1413,7 +1418,8 @@ try {
               speava_session_notification: false,
               speava_session_unrecognized: false,
               speava_session_prompt: false,
-              speava_session_option_string: ""
+              speava_session_option_string: "",
+              speava_session_window_positions: ""
             }, function(items) {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -1426,6 +1432,7 @@ try {
               document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
               document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
               document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
+              document.getElementById('speava_session_window_positions').value = items.speava_session_window_positions;
             });
           }
           document.body.appendChild(dialog);
@@ -1671,9 +1678,36 @@ try {
     if (isTextAreaCreated === null) {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
+      elem.style.top = "0px"
       const text = document.createTextNode('Show stats');
       const objBody = document.getElementsByTagName("body").item(0);
 
+      //{"buttons.style.top": "160px", "elem_others.style.top": "600px","elem_others.style.right": "200px"}
+      //
+      let parsed_json = null;
+      let buttons_style_top = '0px';
+      let buttons_style_right = '100px';
+      let elem_others_style_top = '0px';
+      let elem_others_style_right = null;
+
+      try {
+        parsed_json = JSON.parse(speava_session_window_positions);
+        if ('buttons.style.top' in parsed_json){
+          buttons_style_top = parsed_json["buttons.style.top"];
+        }
+        if ('buttons.style.right' in parsed_json){
+          buttons_style_right = parsed_json["buttons.style.right"];
+        }
+        if ('elem_others.style.top' in parsed_json){
+          elem_others_style_top = parsed_json["elem_others.style.top"];
+        }
+        if ('elem_others.style.right' in parsed_json){
+          elem_others_style_right = parsed_json["elem_others.style.right"];
+        }
+
+      } catch (e) {
+        console.error(`error window_positions parse:`, e);
+      }
       // element for non Google Meet or Zoom sites
       const hostname = document.location.hostname;
       if (hostname.match("meet.google") !== null){
@@ -1681,11 +1715,20 @@ try {
       } else {
         const elem_others = document.createElement('div');
         elem_others.id = "speava_all_others";
-        const text_others = document.createTextNode('Place holder for ad-hoc sites');
-        elem_others.classList.add("option_notification")
-        objBody.appendChild(elem_others);
-        elem_others.appendChild(text_others);
+        // elem_others.style.zIndex = 65000;
+        elem_others.style.top = elem_others_style_top;
+        if (elem_others_style_right !== null) {
+          elem_others.style.right = elem_others_style_right;
+        }
+        elem_others.style.position = 'absolute';
 
+        // const text_others = document.createTextNode('Place holder for ad-hoc sites');
+        elem_others.classList.add("option_notification")
+        elem_others.innerText = 'Place holder for ad-hoc sites';
+        objBody.appendChild(elem_others);
+        // elem_others.appendChild(text_others);
+
+        const toggle_button_div = document.createElement('div');
         const toggle_button = document.createElement('button');
         toggle_button.setAttribute('id',`webkit_speech_recognition_toggle`)
         toggle_button.innerText = "caption on/off";
@@ -1701,15 +1744,25 @@ try {
             toggle_button.classList.add('speava_button_active')
           }
         }
-        objBody.appendChild(toggle_button);
+        toggle_button_div.appendChild(toggle_button);
+        elem_others.appendChild(toggle_button_div);
+        // elem_others.appendChild(toggle_button);
 
         const elem_transcript = document.createElement('div');
         elem_transcript.id = "fixed_part_of_utterance";
+        elem_transcript.style.zIndex = 65000;
+        // elem_transcript.style.wordWrap =
+        if (elem_others_style_right !== null) {
+          elem_transcript.style.width = elem_others_style_right;
+        }
         const elem_interim = document.createElement('div');
         elem_interim.id = "interim_part_of_utterance";
-        objBody.appendChild(elem_transcript);
-        objBody.appendChild(elem_interim);
-
+        elem_interim.style.zIndex = 65000;
+        if (elem_others_style_right !== null) {
+          elem_interim.style.width = elem_others_style_right;
+        }
+        elem_others.appendChild(elem_transcript);
+        elem_others.appendChild(elem_interim);
         SpeechRecognition = webkitSpeechRecognition || SpeechRecognition;
         recognition = new SpeechRecognition();
         recognition.lang = 'en-US';
@@ -1729,8 +1782,9 @@ try {
           for (let i = event.resultIndex; i < event.results.length; i++) {
             let transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
-              finalTranscript = finalTranscript.split("<br>").slice(0,2).join("<br>")
               finalTranscript += "<br>" + transcript;
+              finalTranscript = finalTranscript.split("<br>").slice(finalTranscript.split("<br>").length - 2,finalTranscript.split("<br>").length).join("<br>")
+              // finalTranscript = finalTranscript.split("<br>").slice(0,2).join("<br>")
               const cache = CACHE[index];
               cache.count += 1;
               cache.endedAt = new Date();
@@ -1814,8 +1868,8 @@ try {
       buttons = document.createElement('div');
       isShowing = true;
       buttons.style.zIndex = 103;
-      buttons.style.top = '10px';
-      buttons.style.right = '100px';
+      buttons.style.top = buttons_style_top;
+      buttons.style.right = buttons_style_right;
       buttons.style.position = 'absolute';
       objBody_buttons.appendChild(buttons);
 

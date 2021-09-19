@@ -11,6 +11,7 @@ function save_options() {
   var speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
   var speava_session_prompt = document.getElementById('speava_session_prompt').checked;
   var speava_session_option_string = document.getElementById('speava_session_option_string').value;
+  var speava_session_window_positions = document.getElementById('speava_session_window_positions').value;
   chrome.storage.sync.set({
     speava_session_record: speava_session_record,
     speava_session_spreadsheet_post: speava_session_spreadsheet_post,
@@ -22,7 +23,8 @@ function save_options() {
     speava_session_notification : speava_session_notification,
     speava_session_unrecognized : speava_session_unrecognized,
     speava_session_prompt : speava_session_prompt,
-    speava_session_option_string: speava_session_option_string
+    speava_session_option_string: speava_session_option_string,
+    speava_session_window_positions: speava_session_window_positions
   }, function() {
     // Update status to let user know options were saved.
     var status = document.getElementById('status');
@@ -48,7 +50,8 @@ function restore_options() {
     speava_session_notification: false,
     speava_session_unrecognized: false,
     speava_session_prompt: false,
-    speava_session_option_string: ""
+    speava_session_option_string: "",
+    speava_session_window_positions: ""
   }, function(items) {
     document.getElementById('speava_session_record').value = items.speava_session_record;
     document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -61,6 +64,7 @@ function restore_options() {
     document.getElementById('speava_session_unrecognized').checked = items.speava_session_unrecognized;
     document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
     document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
+    document.getElementById('speava_session_window_positions').value = items.speava_session_window_positions;
   });
 }
 document.addEventListener('DOMContentLoaded', restore_options);
