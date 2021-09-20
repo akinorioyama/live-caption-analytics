@@ -22,7 +22,7 @@ download( 'averaged_perceptron_tagger' )
 
 translate_mapping = str.maketrans(
     {"J": "a", "V": "v", "N": "n", "R": "r", "C": "n", "D": "n", "E": "n", "F": "n", "I": "n", "L": "n", "M": "n",
-     "P": "n", "S": "n", "T": "n", "U": "n", "W": "n", ",": "n", ".": "n"})
+     "P": "n", "S": "n", "T": "n", "U": "n", "W": "n", ",": "n", ".": "n","(": "n",")": "n"})
 
 DB_NAME = "test.db"
 loaded_vocab = pd.read_csv("CEFRJ_vocab.txt", delimiter="\t")
@@ -157,7 +157,8 @@ def vocab_calculate_all(session_string="",include_last_record=False,since_last_u
         return None
 
     df_new = pd.DataFrame(columns = ['session','start','vocab','category','level','actor',])
-
+    # error
+    # (0, ['aki', 'aki', '(', 'you', ')', 'aki', 'aki'])
     try:
         # df['text_stemmed'] = df['text'].apply(word_tokenize).apply(lambda x: [[word_and_tag[0],word_and_tag[1],wnl.lemmatize(word_and_tag[0],pos=word_and_tag[1][0].translate( translate_mapping ))] for word_and_tag in pos_tag(x)])
         l_all_entries = []
@@ -170,14 +171,15 @@ def vocab_calculate_all(session_string="",include_last_record=False,since_last_u
                     continue
                 if w_t_item[1][0] == ".":
                     continue
-                an_entry = wnl.lemmatize(w_t_item[0],pos=w_t_item[1][0].translate( translate_mapping ))
-                l_entries.append([w_t_item[0],w_t_item[1],an_entry])
+                try:
+                    an_entry = wnl.lemmatize(w_t_item[0],pos=w_t_item[1][0].translate( translate_mapping ))
+                    l_entries.append([w_t_item[0],w_t_item[1],an_entry])
+                except KeyError as e:
+                    print("KeyError at vocab_create_all", e)
             l_all_entries.append(l_entries)
         df['text_stemmed'] = l_all_entries
-    except KeyError as e:
-        print(e)
     except Exception as e:
-        print(e)
+        print("Exception at creating text_stemmed",e,df['text'])
 
     for index, row in df.iterrows():
         for line in row['text_stemmed']:

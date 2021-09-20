@@ -76,15 +76,25 @@ def return_prompt_options():
             return  message_json
 
 
-    if (datetime.datetime.now().second % 30 == 0):
+    if (0 <= (datetime.datetime.now().second % 15) <= 0):
 
         data_show = {"notification": {"text": "no data exists from Meet"},
-                     "heading": "Would you like to volunteer to answer the question? Choose an option from the prompt",
+                     "heading": "Would you like to volunteer to answer the question? Choose an option from the prompt.<br>",
                      "prompt_options": "Yes<br>,No<br>,Maybe",
                      "setting":
-                         {"duration": 10}
+                         {"duration": 3000}
                      }
         return jsonify(data_show)
+    elif (7 <= (datetime.datetime.now().second % 10) <= 7):
+
+        data_show = {"notification": {"text": "no data exists from Meet"},
+                     "heading": "'You know' is repetitively used. Avoid using the phrase.<br>",
+                     "prompt_options": "Ok,<br>Not necessary",
+                     "setting":
+                         {"duration": 3000}
+                     }
+        return jsonify(data_show)
+
     else:
         data_show = {"notification": {"text": "no data exists from Meet"},
                      "heading": "no data",
@@ -1439,7 +1449,7 @@ def get_word_per_second(session_string=""):
         is_to_display_speaker_only = True
     else:
         share_text += f'<span style="width:100px;font-size:12px;"  class="head">Speaker</span>'
-    share_text += f'<span style="width:100px;font-size:12px;"  class="head">text</span>' \
+    share_text += f'<span style="width:50%;font-size:12px;"  class="head">text</span>' \
                   f'</div>'
     # for index, row in df[0:20:].iterrows():
     # if len(df[(df['dif'].dt.seconds + df['dif'].dt.microseconds / 1000000) < 0.1]['dif']) != 0:
@@ -1473,8 +1483,8 @@ def get_word_per_second(session_string=""):
         if is_to_display_speaker_only == True:
             is_to_display_speaker_only = True
         else:
-            share_text += f'<span style="width:100px;font-size:12px;"  class="head">{row["actor"]}</span>'
-        share_text += f'<span style="width:70%;font-size:12px;" class="{item_type}">{str.lower(row["text"])}</span>'
+            share_text += f'<span style="width:100px;font-size:12px;"  class="item">{row["actor"]}</span>'
+        share_text += f'<span style="width:50%;font-size:12px;" class="{item_type}">{str.lower(row["text"])}</span>'
         share_text += '</div>'
     # print(share_text)
     data = {"notification": {"text":share_text},
