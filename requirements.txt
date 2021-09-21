@@ -5,3 +5,7 @@ configparser
 nltk
 docopt
 requests
+beautifulsoup4
+selenium
+spacy==2.3.5
+spacy-wordnet

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personalize vocabulary set</title>
+</head>
+<body>
+<form action="/personalize_session" method="POST" enctype="multipart/form-data">
+<div>
+    <span>
+<b>Session id:</b>
+        <input style="width:70%" type="text" name="session" value="{{session}}"><br>
+    </span>
+</div>
+<div>
+    <span>
+<b>username:</b>
+        <input style="width:70%" type="text" name="username" value="{{username}}"><br>
+    </span>
+</div>
+
+<div><span>Above the entered CEFR level</span>
+<span><input style="width:70%"  type="text" name="CEFR_equal_or_above" value="{{CEFR_equal_or_above}}" ></span>
+</div>
+<div><span>Above the entered n th frequency</span>
+<span><input style="width:48px;"  type="text" name="NGSL_equal_or_above" value="{{NGSL_equal_or_above}}" ></span>
+<span><input style="width:48px;"  type="text" name="NGSL_equal_or_below" value="{{NGSL_equal_or_below}}" ></span>
+</div>
+<div><span>Within the domains</span>
+<span><input style="width:70%"  type="text" name="domains" value="{{domains}}"></span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_send_raw" name="alert_overused_words" value="1" {{alert_overused_words}}></span>
+    <span><label for="speava_session_send_raw">alert overused words</label></span>
+</div>
+
+<div>
+<span><input style="width:5%"  type="checkbox" id="suggest_alternatives_for_overused_words" name="suggest_alternatives_for_overused_words" value="1" {{suggest_alternatives_for_overused_words}}></span>
+    <span><label for="suggest_alternatives_for_overused_words">propose alternatives for overused words</label></span>
+</div>
+
+<div>
+<div id="status"></div>
+
+    <table>
+    <tr><td><b>Resource list</b></td></tr>
+{% for index, item in df_resource_list.iterrows(): %}
+    <tr>
+        <td><input type="checkbox" name="resource_list" value="{{item['id']}}" {{item['id_checked']}}></td>
+        <td>{{item['title_of_site']}}</td>
+        <td>{{ item['url'] }}</td>
+    </tr>
+{% endfor %}
+</table>
+
+
+    <button id="save" name="command" value="save">Save</button>
+
+	<input type="submit" value="Search">
+</form>
+<div><span>Result text<br></span>
+<span><textarea name="result_vocab" rows="10" cols="120">{{outside_form}}</textarea></span>
+</div>
+<table>
+    <tr><td><b>Words that match your condition (CEFR level, domain)</b></td></tr>
+{% for index, item in df_list_c1.iterrows(): %}
+    <tr>
+        <td>{{item['vocab']}}</td>
+        <td>{{ item['level'] }}</td>
+        <td>{{ item['NGSL'] }}</td>
+        <td>{{ item['domain'] }}</td>
+    </tr>
+{% endfor %}
+</table>
+
+<!--<script src="options.js"></script>-->
+</body>
+</html>

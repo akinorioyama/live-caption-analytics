@@ -7,6 +7,8 @@
 <body>
 <b>URL:</b><br> {{url}}
 <br>
+<b>Title:</b><br> {{title}}
+<br>
 <b>Vocab options:</b><br>
 {{vocab_string}}
 <table>
@@ -15,6 +17,7 @@
     <tr>
         <td>{{item['vocab']}}</td>
         <td>{{ item['level'] }}</td>
+        <td>{{ item['NGSL'] }}</td>
     </tr>
 {% endfor %}
     <tr><td><b>B1 or Above</b></td></tr>
@@ -22,6 +25,7 @@
     <tr>
         <td>{{item['vocab']}}</td>
         <td>{{ item['level'] }}</td>
+        <td>{{ item['NGSL'] }}</td>
     </tr>
 {% endfor %}
     <tr><td><b>all (up to 50)</b></td></tr>
@@ -30,6 +34,7 @@
     <tr>
         <td>{{item['vocab']}}</td>
         <td>{{ item['level'] }}</td>
+        <td>{{ item['NGSL'] }}</td>
     </tr>
 {% endfor %}
 </table>

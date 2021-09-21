@@ -41,6 +41,7 @@ from save_to_storage import get_blending_logs
 from json import JSONDecodeError
 import config_settings
 DB_NAME = "test.db"
+DB_NAME_SITE = "site.db"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
@@ -1143,14 +1144,18 @@ def get_vocab_coverage(session_string="",option_settings={}):
                              '<span class="head" style="width:40px;"></span>' \
                              '<span class="head" style="width:150px;">vocab.</span>' \
                              '</div>'
+    share_text += '<div>'
     for item in vocab_list:
-        if vocab_list_used[item] != 0:
-            share_text += f'<div><span class="item" style="width:40px;">[{str(vocab_list_used[item])}]</span>' \
-                                     f'<span class="item_blue">{item}</span></div>'
-        else:
-            share_text += f'<div><span class="item" style="width:40px;">[0]</span>' \
-                                     f'<span class="item_red">{item}</span></div>'
+        # share_text += f'<div><span class="item" style="width:40px;">[{str(vocab_list_used[item])}]</span>' \
+        #               f'<span class="item_blue">{item}</span></div>'
+        if vocab_list_used[item] == 0:
+            share_text += f'<span class="item_red"  style="font-size:48px;">{item},</span>'
+        elif ( 1 <= vocab_list_used[item] <= 2 ):
+            share_text += f'<span class="item_blue" style="font-size:24px;>{item},</span>'
+        elif (3 <= vocab_list_used[item] ):
+            share_text += f'<span class="item_blue" style="font-size:12px;>{item},</span>'
 
+    share_text += '</div>'
     share_text += '<div><span class="text_item">Activate those vocab.</span></div>'
     data_json["setting"] = {"duration": 500}
     data_json["notification"] = { "text": share_text }
@@ -1337,6 +1342,8 @@ def get_word_per_second(session_string=""):
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
     df = pd.read_sql("SELECT * FROM caption_sub where session = '" + session_string + "'", conn)
+    conn.close()
+
     if len(df) == 0:
         data_return = {"notification": {"text":f"no data exists for session {session_string}"},
                  "heading": "Word per second",
@@ -1558,6 +1565,21 @@ def create_db():
         'actor VARCHAR(30),'
         'key VARCHAR(20),'
         'value MESSAGE_TEXT )')
+    conn.commit()
+    conn.close()
+
+    dbname = DB_NAME_SITE
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS site_text('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'url MESSAGE_TEXT,'
+	    'title_of_site MESSAGE_TEXT,'
+	    'text_in_json  MESSAGE_TEXT,'
+	    'time_retrieved	DATETIME ) ')
+
     conn.commit()
     conn.close()
 
