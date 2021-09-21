@@ -94,6 +94,7 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20210922|v1.0.3.1.2|**Coverage**: Vocab game|
 |20210921|v1.0.3.1.1|**Retrieval**: Search candidates of words and write to DB<br>**NGSL**: as in-depth classification|
 |20210919|v1.0.3.1|Minor fixes. Addelement position option|
 |20210918|v1.0.3|**Independent window**: pseudo page that replicates extension capture<br>**Dump**: show all the results from available functions<br>**Built-in recognition**: use Chrome built-in speech recognition<br>**Prompt**: show a prompt to solicit inputs initiated from server side<br>**Session_settings**: the table is added. Available keys for session are <li>`vocab_to_cover` and `phrase_to_cover`: value entries with the key will list the words and its use in the session.<br>**Get vocab from an external site**: (**TODO:** .py to be added - in the future commits)|

@@ -738,11 +738,11 @@ def return_notification():
 
         data = get_default_sample_1(session_string=session_string)
 
-    elif (1 < (datetime.datetime.now().second % 20) <= 3):
+    elif (1 < (datetime.datetime.now().second % 20) <= 2):
 
         data = globals()['get_default_sample_1'](session_string=session_string)
 
-    elif (3 < (datetime.datetime.now().second % 20) <= 6):
+    elif (2 < (datetime.datetime.now().second % 20) <= 6):
 
         data = get_vacab_acknowledge_use(session_string=session_string)
 
@@ -750,7 +750,7 @@ def return_notification():
 
         data = get_vacab_sugestion(session_string=session_string)
 
-    elif (10 < (datetime.datetime.now().second % 20) <= 20):
+    elif (10 < (datetime.datetime.now().second % 20) <= 19):
 
         if (10 < (datetime.datetime.now().second % 20) <= 13):
 
@@ -764,7 +764,7 @@ def return_notification():
 
             data = get_vocab_frequency(session_string=session_string)
 
-        elif (18 < (datetime.datetime.now().second % 20) <= 20):
+        elif (18 < (datetime.datetime.now().second % 20) <= 19):
 
             data = get_word_per_second(session_string=session_string)
 
@@ -898,7 +898,7 @@ def get_default_sample_1(session_string=""):
     data = {"notification": {"name": "ヒント:",
                              "text": '<div class="item" style="word-break:break-word;">他の表現も使ってみましょう</div>'},
             "setting":
-                {"duration": 2000}
+                {"duration": 1000}
             }
 
     data = jsonify(data)
@@ -1137,13 +1137,21 @@ def get_vocab_coverage(session_string="",option_settings={}):
     else:
         for item in vocab_list:
             vocab_list_used[item] = 0
-
+    vocab_list_used_counter = 0
+    for item in vocab_list:
+        if vocab_list_used[item] != 0:
+            vocab_list_used_counter += 1
+    vocab_list_used_counter_remaining = len(vocab_list) - vocab_list_used_counter
     data_json = {}
     share_text = ''
     share_text += '<div>' \
-                             '<span class="head" style="width:40px;"></span>' \
-                             '<span class="head" style="width:150px;">vocab.</span>' \
-                             '</div>'
+                  f'<span class="head" style="font-size:48px;">remaining language to cover:</span>' \
+                  f'<span class="head" style="font-size:96px;">{str(vocab_list_used_counter_remaining)}</span>' \
+                  f'<span class="head" style="font-size:48px;">covered language:</span>' \
+                  f'<span class="head" style="font-size:96px;">{str(vocab_list_used_counter)}</span><br>' \
+                  f'<span class="head" style="font-size:48px;">target language:</span>' \
+                  f'<span class="head" style="font-size:96px;">{len(vocab_list)}</span>' \
+                  '</div>'
     share_text += '<div>'
     for item in vocab_list:
         # share_text += f'<div><span class="item" style="width:40px;">[{str(vocab_list_used[item])}]</span>' \
@@ -1151,9 +1159,9 @@ def get_vocab_coverage(session_string="",option_settings={}):
         if vocab_list_used[item] == 0:
             share_text += f'<span class="item_red"  style="font-size:48px;">{item},</span>'
         elif ( 1 <= vocab_list_used[item] <= 2 ):
-            share_text += f'<span class="item_blue" style="font-size:24px;>{item},</span>'
+            share_text += f'<span class="item_blue" style="font-size:24px;">{item},</span>'
         elif (3 <= vocab_list_used[item] ):
-            share_text += f'<span class="item_blue" style="font-size:12px;>{item},</span>'
+            share_text += f'<span class="item_blue" style="font-size:12px;">{item},</span>'
 
     share_text += '</div>'
     share_text += '<div><span class="text_item">Activate those vocab.</span></div>'

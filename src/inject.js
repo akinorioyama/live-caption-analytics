@@ -40,6 +40,8 @@ try {
   // now isolated to updateCurrentMeetingSession
   // let currentSpeakerIndex = null;
 
+  let speava_session_id = "";
+
   // -------------------------------------------------------------------------
   // CACHE is an array of speakers and comments
   //
@@ -640,9 +642,12 @@ try {
     const now = new Date();
     const dateString = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
     const pathString = document.location.pathname.match(/\/(.+)/)[1];
-    const newTranscriptId = `${pathString}-${dateString}`;
+    let newTranscriptId = `${pathString}-${dateString}`;
     const isTranscriptIdChanged = newTranscriptId !== currentTranscriptId;
 
+    if (speava_session_id !== ""){
+      newTranscriptId = speava_session_id;
+    }
     if (isTranscriptIdChanged || currentSessionIndex === null) {
       currentTranscriptId = newTranscriptId;
 
@@ -1371,7 +1376,8 @@ try {
             speava_session_prompt = document.getElementById('speava_session_prompt').checked;
             speava_session_option_string = document.getElementById('speava_session_option_string').value;
             speava_session_window_positions = document.getElementById('speava_session_window_positions').value;
-
+            speava_session_id = document.getElementById('speava_session_id').value;
+            currentTranscriptId = speava_session_id;
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
             speava_server_username = speava_session_username;
@@ -1389,7 +1395,8 @@ try {
               speava_session_unrecognized : speava_session_unrecognized,
               speava_session_prompt : speava_session_prompt,
               speava_session_option_string: speava_session_option_string,
-              speava_session_window_positions: speava_session_window_positions
+              speava_session_window_positions: speava_session_window_positions,
+              speava_session_id: speava_session_id
             }, function() {
               // Update status to let user know options were saved.
               let optional_buttons = document.getElementById('optional_buttons');
@@ -1419,7 +1426,8 @@ try {
               speava_session_unrecognized: false,
               speava_session_prompt: false,
               speava_session_option_string: "",
-              speava_session_window_positions: ""
+              speava_session_window_positions: "",
+              speava_session_id: ""
             }, function(items) {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -1433,6 +1441,7 @@ try {
               document.getElementById('speava_session_prompt').checked = items.speava_session_prompt;
               document.getElementById('speava_session_option_string').value = items.speava_session_option_string;
               document.getElementById('speava_session_window_positions').value = items.speava_session_window_positions;
+              document.getElementById('speava_session_id').value = items.speava_session_id;
             });
           }
           document.body.appendChild(dialog);
