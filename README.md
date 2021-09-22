@@ -1,7 +1,7 @@
 # live-caption-analytics
 This chrome extension sends captions to servers to perform analytics and return feedback to the sender. Thanks to the author of [google-meet-transcripts](https://github.com/dzaman/google-meet-transcripts), the extension is first created to read live caption in **Google Meet**, and evolved to capture subtitles in **Zoom** and **Chrome built-in speech recognition** generated transcript rendered in the proprietary area of the extension by this extension. 
 
-The <b>chrome extension</b> will post the data to two of your servers to analyze or record live transcript. The one endpoint is to perform caption <b>analysis</b> and the other is to send the latest lines of caption to <b>record</b> in a storage, in the sample, a Google spreadsheet. Those two endpoints are independent from each other and can be called separately. This [YouTube video](https://www.youtube.com/watch?v=g1aYP5yyyJQ) will show the screen interaction in the browser. Updated behaviors are included in [YouTube video](https://www.youtube.com/watch?v=TAUHOKM8Tug) (Aug. 30, 2021) and **_YouTube clip for v1.0.3 (~~to be updated soon~~ [1](https://youtu.be/ze80wsKugek), [2](https://youtu.be/PT1dbg1NPA0), and [3](https://youtu.be/Fw1d2o4A3b0)  )_**. V1.0.3.2 introduces tentative code blocks to import texts and use them for vocab coverage (clip will be **available soon**).  
+The <b>chrome extension</b> will post the data to two of your servers to analyze or record live transcript. The one endpoint is to perform caption <b>analysis</b> and the other is to send the latest lines of caption to <b>record</b> in a storage, in the sample, a Google spreadsheet. Those two endpoints are independent from each other and can be called separately. This [YouTube video](https://www.youtube.com/watch?v=g1aYP5yyyJQ) will show the screen interaction in the browser. Updated behaviors are included in [YouTube video](https://www.youtube.com/watch?v=TAUHOKM8Tug) (Aug. 30, 2021) and **_YouTube clip for v1.0.3 (~~to be updated soon~~ [1](https://youtu.be/ze80wsKugek), [2](https://youtu.be/PT1dbg1NPA0), and [3](https://youtu.be/Fw1d2o4A3b0)  )_**. V1.0.3.2 introduces tentative code blocks to import texts and use them for vocab coverage ([here](https://www.youtube.com/watch?v=FrjfukiYkhs) ~~clip will be **available soon**~~).  
 
 **Building blocks**
 ---
@@ -9,7 +9,7 @@ The <b>chrome extension</b> will post the data to two of your servers to analyze
 
 ***1) chrome extension*** part captures live caption and send (request) the portion to servers configured in option settings for the extension, and then receive (response) and render the response from the server. The extension is publicly available from [here](https://chrome.google.com/webstore/detail/pppkdkcchlonlocoiejjinmkdncfblji).
 
-***2) analysis*** receives the caption data from the extension and will perform due calculations to return the response to the sender. The extension users can configure three options and can interact with the UI to control the POST requests to the endpoints, which are `/`, `/log`, `/show`, `/notification`, `/caption`, (`/render_in_full`, `/prompt_check` from v1.0.3). The associated sample sites at the server include `/lca/sample_speaking_session` and `/lca_status/sample_session_copy`.
+***2) analysis*** receives the caption data from the extension and will perform due calculations to return the response to the sender. The extension users can configure three options and can interact with the UI to control the POST requests to the endpoints, which are `/`, `/log`, `/show`, `/notification`, `/caption`, (`/render_in_full`, `/prompt_check` from v1.0.3 and `/show_list`,`/get_vocab`, `/personalize_session` from v1.0.3.1.n). The associated sample sites at the server include `/lca/sample_speaking_session` and `/lca_status/sample_session_copy`.
 
 ***3) record*** sends the current caption line to a POST endpoint. The endpoint can be a Google spreadsheet as in the sample `receive_data.gs` in the folder `peripheral_functions/Google spreadsheet`. The POST enabled spreadsheet will update the received data to the dedicated sheet.
 
@@ -94,9 +94,10 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20210923|v1.0.3.2|**Configuration**: change session id and text color|
 |20210922|v1.0.3.1.2|**Coverage**: Vocab game|
 |20210921|v1.0.3.1.1|**Retrieval**: Search candidates of words and write to DB<br>**NGSL**: as in-depth classification|
-|20210919|v1.0.3.1|Minor fixes. Addelement position option|
+|20210919|v1.0.3.1|Minor fixes. Add element position option|
 |20210918|v1.0.3|**Independent window**: pseudo page that replicates extension capture<br>**Dump**: show all the results from available functions<br>**Built-in recognition**: use Chrome built-in speech recognition<br>**Prompt**: show a prompt to solicit inputs initiated from server side<br>**Session_settings**: the table is added. Available keys for session are <li>`vocab_to_cover` and `phrase_to_cover`: value entries with the key will list the words and its use in the session.<br>**Get vocab from an external site**: (**TODO:** .py to be added - in the future commits)|
 |20210911|v1.0.2|**Zoom**: zoomification to capture transcript in zoom subtitle area powered by 3rd party services (test drive done with Otter.ai)|
 |20210905|v1.0.1|<b>Options</b>: arbitrary option string in chrome extension option to configure what to show.<br><b>Usability</b>: always show extension screen buttons|

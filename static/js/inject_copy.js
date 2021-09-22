@@ -9,7 +9,7 @@ try {
     const new_url = "/static/" + url;
     return new_url;
     }
-  let speava_session_id = null;
+
   // DOM node where Google Meet puts its closed captions
   let captionsContainer  = null;
 
@@ -30,6 +30,8 @@ try {
   let currentSessionIndex = null;
   // now isolated to updateCurrentMeetingSession
   // let currentSpeakerIndex = null;
+
+  let speava_session_id = "";
 
   // -------------------------------------------------------------------------
   // CACHE is an array of speakers and comments
@@ -102,6 +104,7 @@ try {
   let speava_session_unrecognized;
   let speava_session_prompt;
   let speava_session_option_string;
+  let speava_session_text_color;
 
   const hostname_for_adhoc = document.location.hostname;
 
@@ -300,6 +303,8 @@ try {
     speava_session_unrecognized = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
     speava_session_prompt = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
     speava_session_option_string = localStorage.getItem('speava_session_option_string');
+    speava_session_id = localStorage.getItem('speava_session_id');
+    speava_session_text_color = localStorage.getItem('speava_session_text_color');
 
     speava_server_url_to_record = speava_session_record
     currentTranscriptId = speava_session_id;
@@ -317,7 +322,9 @@ try {
       speava_session_notification: false,
       speava_session_unrecognized: false,
       speava_session_prompt: false,
-      speava_session_option_string: null
+      speava_session_option_string: null,
+      speava_session_id: "",
+      speava_session_text_color:""
     }, (items) => {
         // resolve(is_synced = true);
         is_synced = true
@@ -337,9 +344,12 @@ try {
         speava_session_unrecognized =         items.speava_session_unrecognized
         speava_session_prompt =               items.speava_session_prompt;
         speava_session_option_string =        items.speava_session_option_string;
-
+        speava_session_id =                   items.speava_session_id;
+        speava_session_text_color =           items.speava_session_text_color;
         let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
         SPEAKER_NAME_MAP = obj;
+        currentTranscriptId = speava_session_id;
+        applyFontColor(speava_session_text_color);
 
       });
     });
@@ -359,7 +369,9 @@ try {
       speava_session_notification: false,
       speava_session_unrecognized: false,
       speava_session_prompt: false,
-      speava_session_option_string: ""
+      speava_session_option_string: "",
+      speava_session_id:"",
+      speava_session_text_color:""
     }, function(items) {
       speava_server_url_to_record = items.speava_session_record;
       speava_server_url_to_post = items.speava_session_spreadsheet_post;
@@ -372,9 +384,12 @@ try {
       speava_session_unrecognized =         items.speava_session_unrecognized
       speava_session_prompt =               items.speava_session_prompt;
       speava_session_option_string =        items.speava_session_option_string;
-
+      speava_session_id =                   items.speava_session_id;
+      speava_session_text_color =           items.speava_session_text_color;
       let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
       SPEAKER_NAME_MAP = obj;
+      currentTranscriptId = speava_session_id;
+      applyFontColor(speava_session_text_color);
     });
     DEBUG = getOrSet('setting.debug', false);
     READONLY = getOrSet('setting.readonly', false);
@@ -645,9 +660,12 @@ try {
     const now = new Date();
     const dateString = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
     const pathString = document.location.pathname.match(/\/(.+)/)[1];
-    const newTranscriptId = `${pathString}-${dateString}`;
+    let newTranscriptId = `${pathString}-${dateString}`;
     const isTranscriptIdChanged = newTranscriptId !== currentTranscriptId;
 
+    if (speava_session_id !== ""){
+      newTranscriptId = speava_session_id;
+    }
     if (isTranscriptIdChanged || currentSessionIndex === null) {
       currentTranscriptId = newTranscriptId;
 
@@ -1378,6 +1396,7 @@ try {
             speava_session_prompt = document.getElementById('speava_session_prompt').checked;
             speava_session_option_string = document.getElementById('speava_session_option_string').value;
             speava_session_id = document.getElementById('speava_session_id').value;
+            speava_session_text_color = document.getElementById('speava_session_text_color').value;
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
             speava_server_username = speava_session_username;
@@ -1395,9 +1414,11 @@ try {
             localStorage.setItem('speava_session_prompt',speava_session_prompt);
             localStorage.setItem('speava_session_option_string',speava_session_option_string);
             localStorage.setItem('speava_session_id',speava_session_id);
+            localStorage.setItem('speava_session_text_color',speava_session_text_color);
 
             let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
             SPEAKER_NAME_MAP = obj;
+            applyFontColor(speava_session_text_color);
             // chrome.storage.local.set({
             //   speava_session_record: speava_session_record,
             //   speava_session_spreadsheet_post: speava_session_spreadsheet_post,
@@ -1472,6 +1493,7 @@ try {
               document.getElementById('speava_session_unrecognized').checked = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
               document.getElementById('speava_session_prompt').checked = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
               document.getElementById('speava_session_option_string').value = localStorage.getItem('speava_session_option_string');
+              document.getElementById('speava_session_text_color').value = localStorage.getItem('speava_session_text_color');
             // });
 
           }
@@ -1718,6 +1740,8 @@ try {
     if (isTextAreaCreated === null) {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
+      elem.style.top = "0px"
+      elem.style.font.fontcolor(speava_session_text_color);
       const text = document.createTextNode('Show stats');
       const objBody = document.getElementsByTagName("body").item(0);
 
@@ -1945,7 +1969,7 @@ try {
       log_record_type_Button.style.zIndex = 104;
       log_record_type_Button.style.float = 'left';
 
-
+      applyFontColor(speava_session_text_color);
     }
 
   };
@@ -2061,6 +2085,31 @@ try {
 
     return png;
   };
+
+  const applyFontColor = (font_color) => {
+
+    const notification_area = document.getElementById("speava_caption_container");
+    const feedback_textarea = document.getElementById("speava_textarea");
+    const speava_all_others = document.getElementById("speava_all_others");
+    const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
+    const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
+
+    if (speava_all_others) {
+      speava_all_others.style.color = font_color;
+    }
+    if (fixed_part_of_utterance) {
+      fixed_part_of_utterance.style.color = font_color;
+    }
+    if (interim_part_of_utterance){
+      interim_part_of_utterance.style.color = font_color;
+    }
+    if (notification_area){
+      notification_area.style.color = font_color;
+    }
+    if (feedback_textarea){
+      feedback_textarea.style.color = font_color;
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////
   // Main App
