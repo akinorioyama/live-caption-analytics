@@ -52,17 +52,22 @@
     </tr>
 {% endfor %}
 </table>
-
-
+<div><span><b>Text to analyze in addition to the selected resource(s)</b><br></span>
+<span><textarea name="text_to_parse" rows="3" cols="120">{{text_to_parse}}</textarea></span>
+</div>
     <button id="save" name="command" value="save">Save</button>
 
 	<input type="submit" value="Search">
 </form>
-<div><span>Result text<br></span>
-<span><textarea name="result_vocab" rows="10" cols="120">{{outside_form}}</textarea></span>
+<div><span><b>Result text</b> to set in <i>"arbitrary option settings"</i><br></span>
+<span><textarea name="result_vocab">{{outside_form}}</textarea></span>
 </div>
-<table>
-    <tr><td><b>Words that match your condition (CEFR level, domain)</b></td></tr>
+<div><span>The number of hits:<br></span>
+<span style="font-size:xx-large">{{vocab_count}}</span>
+</div>
+
+<table aria-colspan="4">
+    <tr><td><b>Words that match your condition (CEFR level, NGSL rank, domain)</b></td></tr>
 {% for index, item in df_list_c1.iterrows(): %}
     <tr>
         <td>{{item['vocab']}}</td>
@@ -72,6 +77,22 @@
     </tr>
 {% endfor %}
 </table>
+    <style>
+        div.textarea {
+   height: 48px;
+   width: 100%;
+}
+        textarea {
+   position: relative;
+   height: 48px;
+   width: 100%;
+   transition: all 500ms;
+}
+        textarea:focus {
+   z-index: 1001;
+   min-height:250px;
+}
+    </style>
 
 <!--<script src="options.js"></script>-->
 </body>

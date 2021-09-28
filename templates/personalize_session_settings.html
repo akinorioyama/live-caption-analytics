@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personalize vocabulary set</title>
+    <script type="text/javascript">
+        function clear_textareas(){
+            textareas = document.getElementsByTagName("textarea");
+            for (let element of textareas){
+                element.innerText = "";
+            }
+            window.alert("Your entries in boxes below are cleared.");
+        }
+
+    </script>
+</head>
+<body>
+<form action="/personalize_session_settings" method="POST" enctype="multipart/form-data">
+<div>
+    <span>
+<b>Session id:</b>
+        <input style="width:30%" type="text" name="session" value="{{session}}" onchange="clear_textareas();"><br>
+    </span>
+</div>
+<div>
+    <span>
+<b>username:</b>
+        <input style="width:30%" type="text" name="username" value="{{username}}" onchange="clear_textareas();"><br>
+        Use "all" for settings for all the users or your name for settings only for the user. If this item is left blank, the system uses "all" by default.
+
+        <br>
+    </span>
+</div>
+<div><span><b>Notify to avoid the overused words or expression</b><br>
+    Use the format, word:start_frequency:interval,word:start_frequency:interval . For example, yeah:5:3,you know:2:2<br>
+    This means the system will start to inform the user when the user uses the word at the 5th time and the user will be informed every 3 times.<br></span>
+<span><textarea name="text_to_avoid" rows="3" cols="120">{{text_to_avoid}}</textarea></span>
+</div>
+<div><span><b>Suggest synonyms for the overused words or expression</b><br>
+    Use the format, word:start_frequency:interval,word:start_frequency:interval . For example, think:4:2,maybe:2:2<br>
+    This means the system will start to suggest alternative words for the user when the user uses the word at the 4th time and the user will be informed every 2 times.<br></span>
+</span>
+<span><textarea name="text_to_suggest_alternatives" rows="3" cols="120">{{text_to_suggest_alternatives}}</textarea></span>
+</div>
+<div><span><b>Vocaburary set to cover</b><br></span>
+<span><textarea name="vocab_to_cover" rows="3" cols="120">{{vocab_to_cover}}</textarea></span>
+</div>
+    <button id="save" name="command" value="save">Save</button>
+
+	<input type="submit" value="Search">
+</form>
+
+
+    <style>
+        div.textarea {
+   height: 48px;
+   width: 100%;
+}
+        textarea {
+   position: relative;
+   height: 48px;
+   width: 100%;
+   transition: all 500ms;
+}
+        textarea:focus {
+   z-index: 1001;
+   min-height:250px;
+}
+    </style>
+
+<!--<script src="options.js"></script>-->
+</body>
+</html>

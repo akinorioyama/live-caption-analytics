@@ -2,12 +2,13 @@
 Caption analytics
 
 Usage:
-  main.py <host> <port>
+  main.py <host> <port> <debug>
   main.py -h | --help
   main.py --version
 
   <host>:
   <port>:
+  <debug>: DEBUG to keep the incoming data
 
 Examples:
   main.py 0.0.0.0 443
@@ -40,8 +41,9 @@ from save_to_storage import get_delta
 from save_to_storage import get_blending_logs
 from json import JSONDecodeError
 import config_settings
-DB_NAME = "test.db"
+DB_NAME = "main.db"
 DB_NAME_SITE = "site.db"
+DB_NAME_LOG = "log.db"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
@@ -76,34 +78,136 @@ def return_prompt_options():
         if is_granted != True:
             return  message_json
 
+    df_session_vocab_to_cover, df_session_vocab_to_suggest, df_session_vocab_to_avoid = \
+        get_session_settings(username=username,session_string=session_string)
+    df_session_vocab_to_cover_all, df_session_vocab_to_suggest_all, df_session_vocab_to_avoid_all = \
+        get_session_settings(username="all",session_string=session_string)
 
-    if (0 <= (datetime.datetime.now().second % 15) <= 0):
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
 
-        data_show = {"notification": {"text": "no data exists from Meet"},
-                     "heading": "Would you like to volunteer to answer the question? Choose an option from the prompt.<br>",
-                     "prompt_options": "Yes<br>,No<br>,Maybe",
-                     "setting":
-                         {"duration": 3000}
-                     }
-        return jsonify(data_show)
-    elif (7 <= (datetime.datetime.now().second % 10) <= 7):
-
-        data_show = {"notification": {"text": "no data exists from Meet"},
-                     "heading": "'You know' is repetitively used. Avoid using the phrase.<br>",
-                     "prompt_options": "Ok,<br>Not necessary",
-                     "setting":
-                         {"duration": 3000}
-                     }
-        return jsonify(data_show)
-
+    df_session_caption = pd.read_sql("SELECT * FROM caption where " + \
+                                  " session = '" + session_string + "'"
+                                  , conn)
+    df_session_prompt = pd.read_sql("SELECT * FROM session_prompt_log where " + \
+                                  " session = '" + session_string + "'"
+                                  , conn)
+    conn.commit()
+    conn.close()
+    df_vocab_avoid = None
+    if df_session_vocab_to_avoid is not None:
+        df_vocab_avoid_for_user = pd.DataFrame(list(df_session_vocab_to_avoid['value'].str.split(":")))
+    if df_session_vocab_to_avoid_all is not None:
+        df_vocab_avoid = pd.DataFrame(list(df_session_vocab_to_avoid_all['value'].str.split(":")))
+    if df_vocab_avoid is not None:
+        df_vocab_avoid = pd.concat([df_vocab_avoid,df_vocab_avoid_for_user])
+    if df_vocab_avoid is not None and len(df_vocab_avoid) > 0:
+        df_vocab_avoid.columns=['vocab','frequency','interval']
     else:
-        data_show = {"notification": {"text": "no data exists from Meet"},
-                     "heading": "no data",
-                     "prompt_options": "",
-                     "setting":
-                         {"duration": 10}
-                     }
-        return jsonify(data_show)
+        df_vocab_avoid = pd.DataFrame()
+    if df_session_vocab_to_suggest_all is not None:
+        df_vocab_suggest = pd.DataFrame(list(df_session_vocab_to_suggest_all['value'].str.split(":")))
+        if df_vocab_suggest is not None and len(df_vocab_suggest) > 0:
+            df_vocab_suggest.columns=['vocab','frequency','interval']
+    # TODO: merge check all and specific user
+    for index, item in df_vocab_avoid.iterrows():
+        df_hit = df_session_caption['text'].str.contains(item['vocab'] ,case=False)
+        if len(df_hit) != 0:
+            import re
+            df_hit2 = df_session_caption[df_session_caption['text'].str.contains(item['vocab'], case=False)]['text'].apply(lambda s: len(re.findall(item['vocab'],s)))
+            df_hit_index = df_session_caption[df_session_caption['text'].str.contains(item['vocab'], case=False)]['text'].apply(lambda s: len(re.findall(item['vocab'],s)))
+            df_hit_re_index = df_session_caption['text'].apply(lambda s: len(re.findall(item['vocab'], s, flags=re.IGNORECASE)))
+            max_end = df_session_caption[df_hit_re_index > 0]['end'].max()
+            print(df_hit2.sum())
+            num_of_occurance = df_hit_re_index.sum()
+            # history of alert to avoid duplicate notice. Should be through history.
+            if num_of_occurance >= int(item['frequency']):
+                if num_of_occurance == int(item['frequency']):
+                    if len(df_session_prompt[
+                        (df_session_prompt['key'] == 'vocab_to_avoid') & (df_session_prompt['value'] == item['vocab']) &
+                        (df_session_prompt['triggering_criteria'] == str(num_of_occurance))]) == 0:
+                        data_show = {"notification": {"text": "Avoid the specific word"},
+                                     "heading": f"You have used {item['vocab']} for {num_of_occurance} times.<br>",
+                                     "prompt_options": "Yes<br>,No<br>,Maybe",
+                                     "setting":
+                                         {"duration": 3000}
+                                     }
+                        df_new = pd.DataFrame(columns=['session','start','key','value','triggering_criteria'])
+                        tmp_se = pd.Series({
+                            'session': session_string,
+                            'start': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'key': 'vocab_to_avoid',
+                            'value': item['vocab'],
+                            'triggering_criteria': str(num_of_occurance)
+                        }, index=df_new.columns)
+                        df_new = df_new.append(tmp_se, ignore_index=True)
+                        dbname = DB_NAME
+                        conn = sqlite3.connect(dbname)
+                        df_new.to_sql('session_prompt_log', conn, if_exists='append', index=False)
+                        conn.commit()
+                        conn.close()
+
+                        return jsonify(data_show)
+                elif ( (num_of_occurance - (int(item['frequency']))) % int(item['interval'])) == 0:
+                    if len(df_session_prompt[
+                        (df_session_prompt['key'] == 'vocab_to_avoid') & (df_session_prompt['value'] == item['vocab']) &
+                        (df_session_prompt['triggering_criteria'] == str(num_of_occurance))])== 0:
+                        data_show = {"notification": {"text": "Avoid the specific word"},
+                                     "heading": f"You have used {item['vocab']} for {num_of_occurance} times.<br>",
+                                     "prompt_options": "Yes<br>,No<br>,Maybe",
+                                     "setting":
+                                         {"duration": 3000}
+                                     }
+                        df_new = pd.DataFrame(columns=['session','start','key','value','triggering_criteria'])
+                        tmp_se = pd.Series({
+                            'session': session_string,
+                            'start': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'key': 'vocab_to_avoid',
+                            'value': item['vocab'],
+                            'triggering_criteria': str(num_of_occurance)
+                        }, index=df_new.columns)
+                        df_new = df_new.append(tmp_se, ignore_index=True)
+                        dbname = DB_NAME
+                        conn = sqlite3.connect(dbname)
+                        df_new.to_sql('session_prompt_log', conn, if_exists='append', index=False)
+                        conn.commit()
+                        conn.close()
+
+
+                        return jsonify(data_show)
+
+        else:
+            print(f"no hit for {item['vocab']}")
+
+            # session_start = datetime.datetime(2020, 9, 10, 0, 0, 0)
+            # session_start_string = session_start.strftime("%Y-%m-%d %H:%M:%S.%f")
+    # if (0 <= (datetime.datetime.now().second % 15) <= 0):
+    #
+    #     data_show = {"notification": {"text": "no data exists from Meet"},
+    #                  "heading": "Would you like to volunteer to answer the question? Choose an option from the prompt.<br>",
+    #                  "prompt_options": "Yes<br>,No<br>,Maybe",
+    #                  "setting":
+    #                      {"duration": 3000}
+    #                  }
+    #     return jsonify(data_show)
+    # elif (7 <= (datetime.datetime.now().second % 10) <= 7):
+    #
+    #     data_show = {"notification": {"text": "no data exists from Meet"},
+    #                  "heading": "'You know' is repetitively used. Avoid using the phrase.<br>",
+    #                  "prompt_options": "Ok,<br>Not necessary",
+    #                  "setting":
+    #                      {"duration": 3000}
+    #                  }
+    #     return jsonify(data_show)
+    #
+    # else:
+    data_show = {"notification": {"text": "no data exists from Meet"},
+                 "heading": "no data",
+                 "prompt_options": "",
+                 "setting":
+                     {"duration": 10}
+                 }
+    return jsonify(data_show)
 
 @app.route('/caption',methods=['POST','GET'])
 def return_caption():
@@ -229,6 +333,14 @@ def return_heartbeat():
     #               ],axis=1,inplace=True)
     # print(df.columns)
     df.columns=['actor','text','start','end','session','actor_ip']
+    if 'log_incoming_message' in globals():
+        if log_incoming_message == "DEBUG":
+            df_incoming = df.copy()
+            df_incoming.drop(['text','actor_ip'],axis=1, inplace=True)
+            df_incoming['received_time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+            df_incoming['json'] = data
+            insert_incoming_log(df=df_incoming)
+
     # print("df in / after",df)
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
@@ -313,8 +425,11 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
         if len(df_existing[df_to_update_index]) != 0:
             # df_existing[df_to_update_index]['end'][0], df['end'][0], df_existing.iloc[1, :], df_to_update_index, \
             # df_existing[df_to_update_index].index, df_existing.iloc[
-            df_existing.iloc[df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')] = pd.Series(
-                row['end'])
+            try:
+                df_existing.iloc[df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')] = pd.Series(
+                    row['end'])
+            except IndexError as e:
+                print("DEBUG: index 3 is out of bounds for axis 0 with size 3")
             #     df_existing[df_to_update_index].index, df_existing.columns.get_loc('end')], pd.Series(row['end'])
             df_update_list.append(index)
             # update table entry and dataframe
@@ -581,7 +696,7 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
                 found_new_in_past = found_new_in_past[0]
                 # copy first i items to new
                 front_load_part = existing_words[:found_new_in_past]
-
+                frontload_latter_part = existing_words[found_new_in_past:]
                 row_words_to_front_load = row['text'].split(" ")
                 found_past_in_new = [[i,t,n_gram_row[i],n_gram_exist[t]] for i, x in enumerate(n_gram_row) for t in range(0,len(n_gram_exist)-1,1) if x == n_gram_exist[t]]
 
@@ -727,7 +842,8 @@ def return_notification():
     if option_settings != "":
         option_json = json.loads(option_settings)
 
-        data = dynamic_function_call(option_json=option_json,session_string=session_string,section="/notification")
+        data = dynamic_function_call(option_json=option_json,session_string=session_string,
+                                     section="/notification",username=username)
 
         if data is not None:
             return data
@@ -754,7 +870,7 @@ def return_notification():
 
         if (10 < (datetime.datetime.now().second % 20) <= 13):
 
-            data = get_vocab_coverage(session_string=session_string, option_settings=option_json)
+            data = get_vocab_coverage(session_string=session_string, option_settings=option_json, username=username)
 
         elif (13 < (datetime.datetime.now().second % 20) <= 16):
 
@@ -791,7 +907,8 @@ def return_stat_result():
     if option_settings != "":
         option_json = json.loads(option_settings)
 
-        data_return = dynamic_function_call(option_json=option_json, session_string=session_string,section="/show")
+        data_return = dynamic_function_call(option_json=option_json, session_string=session_string,
+                                            section="/show",username=username)
 
         if data_return is not None:
             return data_return
@@ -812,7 +929,7 @@ def return_stat_result():
 
     else:
 
-        data_return = get_vocab_coverage(session_string=session_string,option_settings=option_json)
+        data_return = get_vocab_coverage(session_string=session_string,option_settings=option_json, username=username)
 
     if data_return is None:
         data_show = {"notification": {"text":"stat result"},
@@ -824,7 +941,7 @@ def return_stat_result():
 
     return data_return
 
-def dynamic_function_call(option_json={}, session_string="",section="/show"):
+def dynamic_function_call(option_json={}, session_string="",section="/show",username:str=""):
 
     # sample for option_json - valid
     # option_sample = {"vocab": ["medical", "designated"], "calling_functions": {
@@ -861,7 +978,7 @@ def dynamic_function_call(option_json={}, session_string="",section="/show"):
                         function_name = function_item['function_name']
                         if function_name in allowed_function_list:
                             if function_name == 'get_vocab_coverage':
-                                kwargs = {"session_string": session_string, "option_settings": option_json}
+                                kwargs = {"session_string": session_string, "option_settings": option_json, "username": username}
                             else:
                                 kwargs = {"session_string": session_string}
 
@@ -1094,7 +1211,7 @@ def get_vacab_sugestion(session_string=""):
 
     return data
 
-def get_vocab_coverage(session_string="",option_settings={}):
+def get_vocab_coverage(session_string="",option_settings={}, username:str="all"):
 
     try:
         parsed_option_settings = option_settings
@@ -1121,6 +1238,7 @@ def get_vocab_coverage(session_string="",option_settings={}):
     df['text'] = df['text'].str.lower()
     vocab_list_used = {}
     if len(df_vocab_list) != 0:
+        df_vocab_list = df_vocab_list[(df_vocab_list['actor']=="all") | (df_vocab_list['actor']==username)]
         vocab_list = list(df_vocab_list['value'].str.lower())
     else:
         if parsed_option_settings is None:
@@ -1510,6 +1628,38 @@ def get_word_per_second(session_string=""):
     data = jsonify(data)
     return data
 
+def get_session_settings(username:str="",session_string:str=""):
+
+    df_session_settings = None
+    if session_string is not None:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+
+        df_session_settings = pd.read_sql("SELECT * from session_settings where session = '" + session_string + "'", conn)
+        conn.close()
+
+        df_session_settings.drop(['id'], axis=1, inplace=True)
+        if len(df_session_settings) != 0:
+            if username is None or username =="":
+                df_session_settings = df_session_settings[df_session_settings['actor'] == 'all']
+            else:
+                df_session_settings = df_session_settings[df_session_settings['actor'] == username]
+
+            df_session_vocab_to_cover = df_session_settings[df_session_settings['key']== "vocab_to_cover"]
+            df_session_vocab_to_suggest = df_session_settings[df_session_settings['key']== "vocab_to_suggest"]
+            df_session_vocab_to_avoid = df_session_settings[df_session_settings['key']== "vocab_to_avoid"]
+            return df_session_vocab_to_cover,df_session_vocab_to_suggest,df_session_vocab_to_avoid
+
+    return None, None, None
+
+def insert_incoming_log(df:pd.DataFrame):
+
+    dbname = DB_NAME_LOG
+    conn = sqlite3.connect(dbname)
+    df.to_sql('incoming_message', conn, if_exists='append', index=False)
+    conn.commit()
+    conn.close()
+
 def check_table():
 
     dbname = DB_NAME
@@ -1573,6 +1723,16 @@ def create_db():
         'actor VARCHAR(30),'
         'key VARCHAR(20),'
         'value MESSAGE_TEXT )')
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS session_prompt_log('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'session VARHAR(40),'
+        'start DATETIME,'
+        'actor VARCHAR(30),'
+        'key VARCHAR(20),'
+        'value VARCHAR(20),'
+        'triggering_criteria VARCHAR(20),'
+        'prompt_result VARCHAR(20) )')
     conn.commit()
     conn.close()
 
@@ -1591,12 +1751,30 @@ def create_db():
     conn.commit()
     conn.close()
 
+    dbname = DB_NAME_LOG
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS incoming_message('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'start DATETIME(6),'
+        'end DATETIME(6), '
+        'actor VARCHAR(30),'
+        'received_time DATETIME(6), '
+	    'json TEXT)')
+
+    conn.commit()
+    conn.close()
+
+
 if __name__ == "__main__":
 
     arguments = docopt(__doc__, version="0.1")
 
     host = arguments["<host>"]
     port = int(arguments["<port>"])
+    log_incoming_message =  arguments["<debug>"]
     create_db()
     # insert_db()
     # check_table()

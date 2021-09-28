@@ -24,7 +24,7 @@ translate_mapping = str.maketrans(
     {"J": "a", "V": "v", "N": "n", "R": "r", "C": "n", "D": "n", "E": "n", "F": "n", "I": "n", "L": "n", "M": "n",
      "P": "n", "S": "n", "T": "n", "U": "n", "W": "n", ",": "n", ".": "n","(": "n",")": "n"})
 
-DB_NAME = "test.db"
+DB_NAME = "main.db"
 loaded_vocab = pd.read_csv("CEFRJ_vocab.txt", delimiter="\t")
 dict_cefr_level = {row['headword']: row['CEFR'] for index, row in loaded_vocab.iterrows()}
 

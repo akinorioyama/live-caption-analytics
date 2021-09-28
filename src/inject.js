@@ -709,6 +709,16 @@ try {
     const spans = Array.from(node.querySelectorAll('span')).filter((span) => span.children.length === 0);
     const text = spans.map((span) => span.textContent).join(' ');
 
+    if (person===null){
+      console.log("The person is null");
+      return {
+        image: "null image",
+        person: "null person",
+        text,
+      };
+
+    }
+
     return {
       image: image.src,
       person: person.textContent,
@@ -983,7 +993,14 @@ try {
 
         if (isCentered && isThreeFifthsWidth ||
             isLeftAligned && isNotRightAligned && isWiderThanHalf) {
-          candidates.push(candidate);
+          const person = xpath('.//div/text()', candidate);
+          if (person){
+            if (person.textContent==="Meeting host"){
+              console.log("Meeting host - skipped")
+            } else {
+              candidates.push(candidate);
+            }
+          }
         }
       }
     }

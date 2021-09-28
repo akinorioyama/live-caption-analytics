@@ -44,7 +44,7 @@ from nltk.stem.wordnet import WordNetLemmatizer as WNL
 import urllib.parse
 from flask import render_template
 
-DB_NAME = "test.db"
+DB_NAME = "main.db"
 DB_NAME_SITE = "site.db"
 
 app = Flask(__name__)
@@ -98,13 +98,14 @@ def create_new_df_for_word_list(df:pd.DataFrame=None):
         {"J": "a", "V": "v", "N": "n", "R": "r", "C": "n", "D": "n", "E": "n", "F": "n", "I": "n", "L": "n",
          "M": "n",
          "P": "n", "S": "n", "T": "n", "U": "n", "W": "n", ",": "n", ".": "n",
-         ":":"n","'":"n", ")":"n", "(":"n","`":"n"})
+         ":":"n","'":"n", ")":"n", "(":"n","`":"n","#":"n","$":"n"})
 
     df_new = pd.DataFrame(columns = ['vocab','category','level','NGSL'])
 
     try:
         l_all_entries = []
-        tokenized_df = df['text'].apply(word_tokenize)
+        tokenized_df = df['text'].str.lower()
+        tokenized_df = tokenized_df.apply(word_tokenize)
         word_and_tag = tokenized_df.apply(lambda x: [[word_and_tag[0],word_and_tag[1]] for word_and_tag in pos_tag(x)])
         for w_t_set in word_and_tag:
             l_entries = []
@@ -268,9 +269,12 @@ def receive_log():
             vocab_string = json.dumps({"vocab": list(df_list_all['vocab'].values)})
     else:
         vocab_string = json.dumps({"vocab": list(df_list_c1['vocab'].values )})
+    vocab_count = 0
+    if len(df_list_c1) != 0:
+        vocab_count = len(df_list_c1)
     kwargs = {"df_list_c1" : df_list_c1, "df_list_b1" : df_list_b1, "df_list_all": df_list_all,
               "vocab_string": vocab_string, "url":url,
-              "title": title_text}
+              "title": title_text, "vocab_count":vocab_count}
     from flask import render_template
     text = render_template('get_vocab_list_result.html',**kwargs )
     # text = render_template('get_vocab_list_result.html',df_list_c1 = df_list_c1)
@@ -280,15 +284,104 @@ def receive_log():
 @app.route('/get_vocab', methods=['POST', 'GET'])
 def get_vocabs():
 
-    from flask import render_template
     text = render_template('get_vocab_list.html')
 
     return text
 
-@app.route('/personalize_session', methods=['POST', 'GET'])
-def personalize_for_session():
+@app.route('/personalize_session_settings', methods=['POST', 'GET'])
+def personalize_for_session_settings():
 
     data = request.get_data().decode('utf-8')
+    text_to_avoid = request.form.get("text_to_avoid",None)
+    text_to_suggest_alternatives = request.form.get("text_to_suggest_alternatives",None)
+    vocab_to_cover = request.form.get("vocab_to_cover",None)
+    session_string = request.form.get("session",None)
+    username = request.form.get("username",None)
+
+    kwargs = {}
+    for a in request.form.keys():
+        kwargs[a] =request.form.get(a)
+
+    df_session_settings = None
+    if session_string is not None:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+
+        df_session_settings = pd.read_sql("SELECT * from session_settings where session = '" + session_string + "'", conn)
+        conn.close()
+
+        df_session_settings.drop(['id'], axis=1, inplace=True)
+        if len(df_session_settings) != 0:
+            if username is None or username =="":
+                df_session_settings = df_session_settings[df_session_settings['actor'] == 'all']
+            else:
+                df_session_settings = df_session_settings[df_session_settings['actor'] == username]
+
+            df_session_vocab_to_cover = df_session_settings[df_session_settings['key']== "vocab_to_cover"]
+            df_session_vocab_to_suggest = df_session_settings[df_session_settings['key']== "vocab_to_suggest"]
+            df_session_vocab_to_avoid = df_session_settings[df_session_settings['key']== "vocab_to_avoid"]
+            if text_to_avoid == "":
+                if len(df_session_vocab_to_avoid) != 0:
+                    kwargs['text_to_avoid'] = ",".join(df_session_vocab_to_avoid['value'])
+            else:
+                kwargs['text_to_avoid'] = text_to_avoid
+            if text_to_suggest_alternatives == "":
+                if len(df_session_vocab_to_suggest) != 0:
+                    kwargs['text_to_suggest_alternatives'] = ",".join(df_session_vocab_to_suggest['value'])
+            else:
+                kwargs['text_to_suggest_alternatives'] = text_to_suggest_alternatives
+            if vocab_to_cover == "":
+                if len(df_session_vocab_to_cover) != 0:
+                    kwargs['vocab_to_cover'] = ",".join(df_session_vocab_to_cover['value'])
+            else:
+                kwargs['vocab_to_cover'] = vocab_to_cover
+
+    button_command_value = request.form.get("command",None)
+    if button_command_value == "save":
+        print("save words to db!!")
+        conn = sqlite3.connect(DB_NAME)
+        user_to_update_db = username
+        if user_to_update_db == "":
+            user_to_update_db = "all"
+
+        for key in ['vocab_to_cover','vocab_to_suggest','vocab_to_avoid']:
+            sql_string = 'DELETE FROM session_settings where session = "' + session_string + '"' + \
+                         ' and key = "' + key + '"' + \
+                         ' and actor = "' + user_to_update_db + '"'
+            conn.execute(sql_string)
+        conn.commit()
+        # add entries
+        if vocab_to_cover != "":
+            df_session_vocab_to_cover = pd.DataFrame(vocab_to_cover.split(","))
+            df_session_vocab_to_cover.columns = ['value']
+            df_session_vocab_to_cover['session'] = session_string
+            df_session_vocab_to_cover['actor'] = user_to_update_db
+            df_session_vocab_to_cover['key'] = "vocab_to_cover"
+            df_session_vocab_to_cover.to_sql('session_settings', conn, if_exists='append', index=False)
+        if text_to_avoid != "":
+            df_session_vocab_to_avoid = pd.DataFrame(text_to_avoid.split(","))
+            df_session_vocab_to_avoid.columns = ['value']
+            df_session_vocab_to_avoid['session'] = session_string
+            df_session_vocab_to_avoid['actor'] = user_to_update_db
+            df_session_vocab_to_avoid['key'] = "vocab_to_avoid"
+            df_session_vocab_to_avoid.to_sql('session_settings', conn, if_exists='append', index=False)
+        if text_to_suggest_alternatives != "":
+            df_session_vocab_to_suggest = pd.DataFrame(text_to_suggest_alternatives.split(","))
+            df_session_vocab_to_suggest.columns = ['value']
+            df_session_vocab_to_suggest['session'] = session_string
+            df_session_vocab_to_suggest['actor'] = user_to_update_db
+            df_session_vocab_to_suggest['key'] = "vocab_to_suggest"
+            df_session_vocab_to_suggest.to_sql('session_settings', conn, if_exists='append', index=False)
+        conn.commit()
+        conn.close()
+    text = render_template('personalize_session_settings.html', **kwargs)
+    return text
+
+@app.route('/personalize_session', methods=['POST', 'GET'])
+def personalize_for_session_vocab():
+
+    data = request.get_data().decode('utf-8')
+    text_to_be_parsed = request.form.get('text_to_parse',"")
     outside_form_value = "calculated result"
     kwargs = {"outside_form": outside_form_value }
 
@@ -327,11 +420,21 @@ def personalize_for_session():
             df_to_add = create_new_df_for_word_list(df)
             df_new = pd.concat([df_new,df_to_add])
 
+    if text_to_be_parsed != "":
+        df = pd.DataFrame([text_to_be_parsed])
+        df.columns=['text']
+        if df_new is None:
+            df_new = create_new_df_for_word_list(df)
+        else:
+            df_to_add = create_new_df_for_word_list(df)
+            df_new = pd.concat([df_new,df_to_add])
+
     if df_new is None:
         kwargs['df_resource_list'] = df_resource_list
         kwargs["df_list_c1"] = pd.DataFrame()
         vocab_string = ""
         kwargs["outside_form"] = vocab_string
+        kwargs['text_to_be_parsed'] = text_to_be_parsed
 
         text = render_template('personalize_vocab.html', **kwargs)
         return text

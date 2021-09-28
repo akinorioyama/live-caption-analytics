@@ -1,4 +1,4 @@
-DB_NAME = "test.db"
+DB_NAME = "main.db"
 import sqlite3
 import pandas as pd
 import datetime
