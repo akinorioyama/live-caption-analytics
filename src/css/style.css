@@ -1,12 +1,9 @@
     #speava_session_notification {
-        /*color: #FFFFFF !important;*/
         margin-top: 10px !important;
-        z-index: 102 !important;
     }
 
     #speava_session_notification.display_dialog {
         visibility: visible !important;
-        /*color: #FFFFFF !important;*/
         margin-top: 10px !important;
     }
 
@@ -15,15 +12,12 @@
         visibility: hidden !important;
     }
     #speava_session_notification.option_notification {
-        /*color: rgba(255, 255, 255, 0.5) !important;*/
         font-size: 12px  !important;
         visibility: visible !important;
     }
 
     #speava_caption_reaction {
-        /*color: rgba(255, 255, 255, 0.5) !important;*/
         font-size: 24px !important;
-        z-index: 120 !important;
         tab-index: 3;
     }
     #speava_caption_reaction.display_none{
@@ -31,16 +25,12 @@
     }
 
     #speava_textarea {
-        /*color : #FFFFFF;*/
         position : absolute;
-        width: 300px;
-        z-index: 101;
     }
     #speava_textarea.display_none{
         visibility: hidden !important;
     }
     #speava_textarea.option_notification {
-        /*color: rgba(255, 255, 255, 0.5) !important;*/
         font-size: 12px  !important;
     }
 
@@ -49,42 +39,32 @@
     }
 
     .item {
-        /*color : #FFFFFF;*/
         font-size : 12px;
-        z-index: 101;
         display:inline-block;
     }
     .head {
-        /*color : #FFFFFF;*/
         font-size : 24px;
-        z-index: 101;
         display:inline-block;
     }
 
     .item_blue {
-        /*color : #FFFFFF;*/
         background-color : darkblue !important;
         font-size : 24px;
         display:inline-block;
     }
 
     .item_red {
-        /*color : #FFFFFF;*/
         background-color : indianred !important;
         font-size : 24px;
         display:inline-block;
     }
 
     .text_item {
-        /*color : #FFFFFF;*/
         font-size : 24px;
-        /*line-height: 12px;*/
         display:inline-block;
     }
 
     .text_head {
-        /*color : #FFFFFF;*/
-        /*line-height: 24px;*/
         font-size : 48px;
         display:inline-block;
     }
@@ -94,8 +74,6 @@
         flex-flow: column;
         flex-direction: column !important;
         position : absolute !important;
-        left : 300px !important;
-        top : 144px !important;
     }
 
     .repeat_flash {

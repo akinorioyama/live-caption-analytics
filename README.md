@@ -15,7 +15,7 @@ The <b>chrome extension</b> will post the data to two of your servers to analyze
 
 Each section is stored in the following paths.
 ```
-/src              <-- 1) chrome extension
+/src             <-- 1) chrome extension
 main.py          <---2) analysis - sample implementation
 receive_data.gs  <-- 3) record - snippet to publish and will listen to POST calls
 vocab_suggest.py <---4) analysis - sample implementation for vocabulary profile
@@ -96,6 +96,7 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20211001|v1.0.3.4|**Configuration**: place elements and apply changes immediately<br>**Domains**: add a part of *.net domains|
 |20210928|v1.0.3.3|**Personalization**: change vocabulary to work on<br>**DB filename**: from test.db to main.db<br>minor fixes: refrain from focusing on participant list|
 |20210923|v1.0.3.2|**Configuration**: change session id and text color|
 |20210922|v1.0.3.1.2|**Coverage**: Vocab game|

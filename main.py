@@ -49,6 +49,17 @@ app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
 
+allowed_function_list = ['get_default_sample_1',
+                         'get_vacab_acknowledge_use',
+                         'get_vacab_sugestion',
+                         'get_vocab_coverage',
+                         'get_turn_taking',
+                         'get_vocab_frequency',
+                         'get_word_per_second',
+                         'get_issued_prompts']
+loaded_vocab_ngsl = pd.read_csv("NGSL+1.txt", delimiter="\t")
+dict_ngsl_level = {row['Lemma']: index for index, row in loaded_vocab_ngsl.iterrows()}
+
 def is_correct_session_access_code(session_string="", option_settings=""):
 
     #  - ip and username will not work due to users not sending any data to server
@@ -96,13 +107,21 @@ def return_prompt_options():
     conn.close()
     df_vocab_avoid = None
     if df_session_vocab_to_avoid is not None:
-        df_vocab_avoid_for_user = pd.DataFrame(list(df_session_vocab_to_avoid['value'].str.split(":")))
+        df_vocab_avoid = pd.merge(df_session_vocab_to_avoid.reset_index(), pd.concat(
+            [pd.DataFrame(df_session_vocab_to_avoid.index, columns=['index']),
+             pd.DataFrame(list(df_session_vocab_to_avoid['value'].str.split(":")))], axis=1))
+        # pd.concat([df_session_vocab_to_avoid.reset_index(), pd.concat(
+        #     [pd.DataFrame(df_session_vocab_to_avoid.index, columns=['index']),
+        #      pd.DataFrame(list(df_session_vocab_to_avoid['value'].str.split(":")))], axis=1)], axis=1)
+        # pd.concat([ pd.DataFrame(list(df_session_vocab_to_avoid['value'].str.split(":")))])
     if df_session_vocab_to_avoid_all is not None:
-        df_vocab_avoid = pd.DataFrame(list(df_session_vocab_to_avoid_all['value'].str.split(":")))
-    if df_vocab_avoid is not None:
-        df_vocab_avoid = pd.concat([df_vocab_avoid,df_vocab_avoid_for_user])
+        df_vocab_avoid_all = pd.merge(df_session_vocab_to_avoid_all.reset_index(), pd.concat(
+            [pd.DataFrame(df_session_vocab_to_avoid_all.index, columns=['index']),
+             pd.DataFrame(list(df_session_vocab_to_avoid_all['value'].str.split(":")))], axis=1))
+        # df_vocab_avoid = pd.DataFrame(list(df_session_vocab_to_avoid_all['value'].str.split(":")))
+        df_vocab_avoid = pd.concat([df_vocab_avoid, df_vocab_avoid_all])
     if df_vocab_avoid is not None and len(df_vocab_avoid) > 0:
-        df_vocab_avoid.columns=['vocab','frequency','interval']
+        df_vocab_avoid.columns=['index','session','actor','key','value','vocab','frequency','interval']
     else:
         df_vocab_avoid = pd.DataFrame()
     if df_session_vocab_to_suggest_all is not None:
@@ -117,14 +136,20 @@ def return_prompt_options():
             df_hit2 = df_session_caption[df_session_caption['text'].str.contains(item['vocab'], case=False)]['text'].apply(lambda s: len(re.findall(item['vocab'],s)))
             df_hit_index = df_session_caption[df_session_caption['text'].str.contains(item['vocab'], case=False)]['text'].apply(lambda s: len(re.findall(item['vocab'],s)))
             df_hit_re_index = df_session_caption['text'].apply(lambda s: len(re.findall(item['vocab'], s, flags=re.IGNORECASE)))
+            df_hit_re_index = df_session_caption[df_session_caption['actor'] == item['actor']]['text'].apply(
+                lambda s: len(re.findall(item['vocab'], s, flags=re.IGNORECASE)))
+            if len(df_hit_re_index) == 0:
+                continue
             max_end = df_session_caption[df_hit_re_index > 0]['end'].max()
             print(df_hit2.sum())
             num_of_occurance = df_hit_re_index.sum()
+            # counter (all, username)
             # history of alert to avoid duplicate notice. Should be through history.
-            if num_of_occurance >= int(item['frequency']):
+            if item['frequency'] is not None and num_of_occurance >= int(item['frequency']):
                 if num_of_occurance == int(item['frequency']):
                     if len(df_session_prompt[
                         (df_session_prompt['key'] == 'vocab_to_avoid') & (df_session_prompt['value'] == item['vocab']) &
+                        (df_session_prompt['actor'] == item['actor']) &
                         (df_session_prompt['triggering_criteria'] == str(num_of_occurance))]) == 0:
                         data_show = {"notification": {"text": "Avoid the specific word"},
                                      "heading": f"You have used {item['vocab']} for {num_of_occurance} times.<br>",
@@ -132,10 +157,11 @@ def return_prompt_options():
                                      "setting":
                                          {"duration": 3000}
                                      }
-                        df_new = pd.DataFrame(columns=['session','start','key','value','triggering_criteria'])
+                        df_new = pd.DataFrame(columns=['session','start','actor','key','value','triggering_criteria'])
                         tmp_se = pd.Series({
                             'session': session_string,
                             'start': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'actor': username,
                             'key': 'vocab_to_avoid',
                             'value': item['vocab'],
                             'triggering_criteria': str(num_of_occurance)
@@ -151,6 +177,7 @@ def return_prompt_options():
                 elif ( (num_of_occurance - (int(item['frequency']))) % int(item['interval'])) == 0:
                     if len(df_session_prompt[
                         (df_session_prompt['key'] == 'vocab_to_avoid') & (df_session_prompt['value'] == item['vocab']) &
+                        (df_session_prompt['actor'] == item['actor']) &
                         (df_session_prompt['triggering_criteria'] == str(num_of_occurance))])== 0:
                         data_show = {"notification": {"text": "Avoid the specific word"},
                                      "heading": f"You have used {item['vocab']} for {num_of_occurance} times.<br>",
@@ -158,10 +185,11 @@ def return_prompt_options():
                                      "setting":
                                          {"duration": 3000}
                                      }
-                        df_new = pd.DataFrame(columns=['session','start','key','value','triggering_criteria'])
+                        df_new = pd.DataFrame(columns=['session','start','actor','key','value','triggering_criteria'])
                         tmp_se = pd.Series({
                             'session': session_string,
                             'start': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            'actor': username,
                             'key': 'vocab_to_avoid',
                             'value': item['vocab'],
                             'triggering_criteria': str(num_of_occurance)
@@ -796,13 +824,6 @@ def return_all_results():
 
     received_session = request.args.get('session')
     session_string = received_session
-    allowed_function_list = ['get_default_sample_1',
-                             'get_vacab_acknowledge_use',
-                             'get_vacab_sugestion',
-                             'get_vocab_coverage',
-                             'get_turn_taking',
-                             'get_vocab_frequency',
-                             'get_word_per_second']
     data_all = []
 
     data_show = {"notification": {"text": f"session:{received_session}"},
@@ -872,9 +893,12 @@ def return_notification():
 
             data = get_vocab_coverage(session_string=session_string, option_settings=option_json, username=username)
 
-        elif (13 < (datetime.datetime.now().second % 20) <= 16):
+        elif (13 < (datetime.datetime.now().second % 20) <= 15):
 
             data = get_turn_taking(session_string=session_string)
+
+        elif (15 < (datetime.datetime.now().second % 20) <= 16):
+            data = get_issued_prompts(session_string=session_string, option_settings=option_json, username=username)
 
         elif (16 < (datetime.datetime.now().second % 20) <= 18):
 
@@ -953,13 +977,6 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",user
     #     "/show": {"frequecy": 10, "function_list": [{"from": 0, "to": 2, "function_name": "get_default_sample_1n"},
     #                                                  {"from": 3, "to": 5, "function_name": "get_vocab_coverage"},
     #                                                  {"from": 6, "to": 9, "function_name": "get_turn_taking"}]}}}
-    allowed_function_list = ['get_default_sample_1',
-                             'get_vacab_acknowledge_use',
-                             'get_vacab_sugestion',
-                             'get_vocab_coverage',
-                             'get_turn_taking',
-                             'get_vocab_frequency',
-                             'get_word_per_second']
 
     if 'calling_functions' in option_json:
 
@@ -977,7 +994,7 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",user
                     if function_item['from'] <= mod_of_time <= function_item['to']:
                         function_name = function_item['function_name']
                         if function_name in allowed_function_list:
-                            if function_name == 'get_vocab_coverage':
+                            if function_name in ['get_vocab_coverage','get_issued_prompts']:
                                 kwargs = {"session_string": session_string, "option_settings": option_json, "username": username}
                             else:
                                 kwargs = {"session_string": session_string}
@@ -1314,8 +1331,8 @@ def get_vocab_frequency(session_string=""):
 
         df_freq_session = get_frequently_used_words(session=session_string)
 
-    df_freq_session = remove_stopwords_entry(df=df_freq_session)
-
+    # df_freq_session = remove_stopwords_entry(df=df_freq_session)
+    # "so" is included in stopwords -> no effects... The so could be missing in vocab_aggregate
     if len(df_freq_session) == 0:
         share_text = f"<div>No frequency data for {session_string}</div>"
         data_show = {"notification": {"text": share_text},
@@ -1342,6 +1359,7 @@ def get_vocab_frequency(session_string=""):
     word_count = df_freq_session['count(vocab)'].sum()
     df_freq_session_all = df_freq_session.groupby(['level','vocab']).sum()
     df_freq_session_all = pd.DataFrame(df_freq_session_all.reset_index())
+    df_freq_session_all['ngsl'] = pd.Series( [ dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_session_all['vocab'] ])
     df_freq_session_all = df_freq_session_all[df_freq_session_all['count(vocab)'] >= (
     df_freq_session_all[df_freq_session_all['count(vocab)'] >= 2].mean()['count(vocab)'])]
     df_speaker_list = df_freq_session.drop_duplicates(subset=['actor'])
@@ -1352,7 +1370,7 @@ def get_vocab_frequency(session_string=""):
     for index, row in df_freq_session_all.iterrows():
         share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
         share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
-                      f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}</span>' \
+                      f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}/{row["ngsl"]}</span>' \
                       f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
         share_text += '</div>'
 
@@ -1363,6 +1381,8 @@ def get_vocab_frequency(session_string=""):
         df_freq_each_speaker_group = df_freq_each_speaker.groupby(['level','vocab']).sum()
         df_freq_each_speaker_group = pd.DataFrame(df_freq_each_speaker_group.reset_index())
         df_freq_each_speaker = df_freq_each_speaker_group
+        df_freq_each_speaker['ngsl'] = pd.Series(
+            [dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_each_speaker['vocab']])
         df_freq_each_speaker.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
         share_text += '<br><br><br>'
         share_text += f'<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">Speaker:{speaker_item["actor"]} words({str(word_count)})</div>'
@@ -1370,7 +1390,7 @@ def get_vocab_frequency(session_string=""):
         for index, row in df_freq_each_speaker.iterrows():
             share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
             share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
-                          f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}</span>' \
+                          f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}/{row["ngsl"]}</span>' \
                           f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
             share_text += '</div>'
 
@@ -1627,6 +1647,58 @@ def get_word_per_second(session_string=""):
              }
     data = jsonify(data)
     return data
+
+def get_issued_prompts(session_string="",option_settings={}, username:str="all"):
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df_session_prompt = pd.read_sql("SELECT * FROM session_prompt_log where " + \
+                                  " session = '" + session_string + "'"
+                                  , conn)
+    conn.close()
+
+    if len(df_session_prompt) == 0:
+        data_return = {"notification": {"text":f"no data exists for session {session_string}"},
+                 "heading": "prompt issued",
+                 "setting":
+                     {"duration": 500}
+                 }
+        data_return_json = jsonify(data_return)
+        return data_return_json
+
+    list_actors = [ a[0] for a in df_session_prompt.groupby(["actor"]).groups.items()]
+
+    df_all = (df_session_prompt.groupby(["actor","key","value"]).count()).reset_index()
+    df_all.columns = ['actor','key','value','count','session','start','triggering_criteria','prompt_result']
+    df_all.sort_values(['actor','key','value'], ascending=[True,True,False], inplace=True)
+
+    # TODO: allow config
+    is_to_display_speaker_only = False
+    if is_to_display_speaker_only == True:
+        is_to_display_speaker_only = True
+
+    share_text = '<div>'
+    share_text += f'<span style="width:64px;font-size:12px;" class="head">Speaker</span>' \
+                  f'<span style="width:128px;font-size:12px;" class="head">key</span>' \
+                  f'<span style="width:128px;font-size:12px;"  class="head">value</span>' \
+                  f'<span style="width:50px;font-size:12px;"  class="head">count</span>' + \
+                  '</div>'
+    for index, row in df_all.iterrows():
+        share_text += f'<div>' + \
+                      f'<span style="width:64px;font-size:12px;" class="item">{row["actor"]}</span>' + \
+                      f'<span style="width:128px;font-size:12px;" class="item">{row["key"]}</span>' + \
+                      f'<span style="width:128px;font-size:12px;" class="item">{row["value"]}</span>' + \
+                      f'<span style="width:50px;font-size:12px;" class="item">{format(row["count"], ".0f")}</span>' + \
+                      f'</div>'
+
+    data = {"notification": {"text":share_text},
+             "heading": "prompt issued",
+             "setting":
+                 {"duration": 500}
+             }
+    data = jsonify(data)
+    return data
+
 
 def get_session_settings(username:str="",session_string:str=""):
 

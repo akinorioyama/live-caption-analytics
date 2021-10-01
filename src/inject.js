@@ -343,6 +343,7 @@ try {
         let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
         SPEAKER_NAME_MAP = obj;
         applyFontColor(speava_session_text_color);
+        applyOptionStyles();
       });
     });
   }
@@ -384,6 +385,7 @@ try {
       SPEAKER_NAME_MAP = obj;
       currentTranscriptId = speava_session_id;
       applyFontColor(speava_session_text_color);
+      applyOptionStyles();
     });
     DEBUG = getOrSet('setting.debug', false);
     READONLY = getOrSet('setting.readonly', false);
@@ -1414,6 +1416,7 @@ try {
             let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
             SPEAKER_NAME_MAP = obj;
             applyFontColor(speava_session_text_color);
+            applyOptionStyles();
             chrome.storage.sync.set({
               speava_session_record: speava_session_record,
               speava_session_spreadsheet_post: speava_session_spreadsheet_post,
@@ -1722,36 +1725,11 @@ try {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
       elem.style.top = "0px"
+      elem.style.witdh = "300px"
       elem.style.font.fontcolor(speava_session_text_color);
       const text = document.createTextNode('Show stats');
       const objBody = document.getElementsByTagName("body").item(0);
 
-      //{"buttons.style.top": "160px", "elem_others.style.top": "600px","elem_others.style.right": "200px"}
-      //
-      let parsed_json = null;
-      let buttons_style_top = '0px';
-      let buttons_style_right = '100px';
-      let elem_others_style_top = '0px';
-      let elem_others_style_right = null;
-
-      try {
-        parsed_json = JSON.parse(speava_session_window_positions);
-        if ('buttons.style.top' in parsed_json){
-          buttons_style_top = parsed_json["buttons.style.top"];
-        }
-        if ('buttons.style.right' in parsed_json){
-          buttons_style_right = parsed_json["buttons.style.right"];
-        }
-        if ('elem_others.style.top' in parsed_json){
-          elem_others_style_top = parsed_json["elem_others.style.top"];
-        }
-        if ('elem_others.style.right' in parsed_json){
-          elem_others_style_right = parsed_json["elem_others.style.right"];
-        }
-
-      } catch (e) {
-        console.error(`error window_positions parse:`, e);
-      }
       // element for non Google Meet or Zoom sites
       const hostname = document.location.hostname;
       if (hostname.match("meet.google") !== null){
@@ -1759,26 +1737,17 @@ try {
       } else {
         const elem_others = document.createElement('div');
         elem_others.id = "speava_all_others";
-        // elem_others.style.zIndex = 65000;
-        elem_others.style.top = elem_others_style_top;
-        if (elem_others_style_right !== null) {
-          elem_others.style.right = elem_others_style_right;
-        }
         elem_others.style.position = 'absolute';
 
-        // const text_others = document.createTextNode('Place holder for ad-hoc sites');
         elem_others.classList.add("option_notification")
         elem_others.innerText = 'Place holder for ad-hoc sites';
         objBody.appendChild(elem_others);
-        // elem_others.appendChild(text_others);
 
         const toggle_button_div = document.createElement('div');
         const toggle_button = document.createElement('button');
         toggle_button.setAttribute('id',`webkit_speech_recognition_toggle`)
         toggle_button.innerText = "caption on/off";
         toggle_button.setAttribute('class',"speava_button");
-        // toggle_button.style.borderRadius = "10px";
-        // toggle_button.style.lineHeight = "2.5";
         toggle_button.onclick = () => {
           if ( toggle_button.classList.contains("speava_button_active")){
             recognition.stop();
@@ -1790,21 +1759,11 @@ try {
         }
         toggle_button_div.appendChild(toggle_button);
         elem_others.appendChild(toggle_button_div);
-        // elem_others.appendChild(toggle_button);
 
         const elem_transcript = document.createElement('div');
         elem_transcript.id = "fixed_part_of_utterance";
-        elem_transcript.style.zIndex = 65000;
-        // elem_transcript.style.wordWrap =
-        if (elem_others_style_right !== null) {
-          elem_transcript.style.width = elem_others_style_right;
-        }
         const elem_interim = document.createElement('div');
         elem_interim.id = "interim_part_of_utterance";
-        elem_interim.style.zIndex = 65000;
-        if (elem_others_style_right !== null) {
-          elem_interim.style.width = elem_others_style_right;
-        }
         elem_others.appendChild(elem_transcript);
         elem_others.appendChild(elem_interim);
         SpeechRecognition = webkitSpeechRecognition || SpeechRecognition;
@@ -1911,16 +1870,13 @@ try {
       const objBody_buttons = document.getElementsByTagName("body").item(0);
       buttons = document.createElement('div');
       isShowing = true;
-      buttons.style.zIndex = 103;
-      buttons.style.top = buttons_style_top;
-      buttons.style.right = buttons_style_right;
+      buttons.id = "speava_buttons";
       buttons.style.position = 'absolute';
       objBody_buttons.appendChild(buttons);
 
       const toggleButton = document.createElement('div');
       toggleButton.style.display = 'flex';
       toggleButton.style.position = 'relative';
-      toggleButton.style.zIndex = 104;
       toggleButton.onclick = tryTo(toggleTranscribing, 'toggling grid');
       buttons.prepend(toggleButton);
 
@@ -1963,7 +1919,6 @@ try {
       buttons.prepend(deleteButton);
       deleteButton.style.display = 'flex';
       deleteButton.style.position = 'relative';
-      deleteButton.style.zIndex = 104;
       deleteButton.style.float = 'left';
       deleteButton.appendChild(makePng(_PNG_DELETE, 36, 36, { id: "clearTranscript", onclick: clearTranscript }));
 
@@ -1971,7 +1926,6 @@ try {
       buttons.prepend(configButton);
       configButton.style.display = 'flex';
       configButton.style.position = 'relative';
-      configButton.style.zIndex = 104;
       configButton.style.float = 'left';
       configButton.appendChild(makePng(_PNG_CONFIG, 36, 36, { id: "config", onclick: open_options }));
 
@@ -1979,7 +1933,6 @@ try {
       buttons.prepend(logButton);
       logButton.style.display = 'flex';
       logButton.style.position = 'relative';
-      logButton.style.zIndex = 104;
       logButton.style.float = 'left';
       logButton.appendChild(makePng(_PNG_LOG, 128, 128, { id: "log", onclick: reactionFocus_log_action }));
 
@@ -1993,10 +1946,10 @@ try {
 
       log_record_type_Button.style.display = 'flex';
       log_record_type_Button.style.position = 'relative';
-      log_record_type_Button.style.zIndex = 104;
       log_record_type_Button.style.float = 'left';
 
       applyFontColor(speava_session_text_color);
+      applyOptionStyles();
     }
 
   };
@@ -2135,6 +2088,115 @@ try {
     }
     if (feedback_textarea){
       feedback_textarea.style.color = font_color;
+    }
+  }
+
+  const applyOptionStyles = () => {
+
+    const notification_area = document.getElementById("speava_caption_container");
+    const feedback_textarea = document.getElementById("speava_textarea");
+    const speava_all_others = document.getElementById("speava_all_others");
+    const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
+    const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
+    const buttons_for_command = document.getElementById("speava_buttons");
+
+    let parsed_json = null;
+    let buttons_style_top = '0px';
+    let buttons_style_right = '100px';
+    let elem_others_style_top = '0px';
+    let elem_others_style_right = null;
+    let z_index = 65000;
+    let notification_area_top = "0px";
+    let notification_area_right = null;
+    let notification_area_left = null;
+    let notification_area_width = null;
+    let feedback_textarea_top = "0px";
+    let feedback_textarea_right = null;
+    let feedback_textarea_left = null;
+    let feedback_textarea_width = "300px";
+
+    try {
+      parsed_json = JSON.parse(speava_session_window_positions);
+      if ('buttons.style.top' in parsed_json){
+        buttons_style_top = parsed_json["buttons.style.top"];
+      }
+      if ('buttons.style.right' in parsed_json){
+        buttons_style_right = parsed_json["buttons.style.right"];
+      }
+      if ('elem_others.style.right' in parsed_json){
+        elem_others_style_right = parsed_json["elem_others.style.right"];
+      }
+       if ('elem_others.style.top' in parsed_json){
+        elem_others_style_top = parsed_json["elem_others.style.top"];
+      }
+      if ('notification_area_top' in parsed_json){
+        notification_area_top = parsed_json["notification_area_top"];
+      }
+      if ('notification_area_right' in parsed_json) {
+        notification_area_right = parsed_json["notification_area_right"];
+      }
+      if ('notification_area_left' in parsed_json) {
+        notification_area_left = parsed_json["notification_area_left"];
+      }
+      if ('notification_area_width' in parsed_json) {
+        notification_area_width = parsed_json["notification_area_width"];
+      }
+      if ('feedback_textarea_top' in parsed_json){
+        feedback_textarea_top = parsed_json["feedback_textarea_top"];
+      }
+      if ('feedback_textarea_right' in parsed_json) {
+        feedback_textarea_right = parsed_json["feedback_textarea_right"];
+      }
+      if ('feedback_textarea_left' in parsed_json) {
+        feedback_textarea_left = parsed_json["feedback_textarea_left"];
+      }
+      if ('feedback_textarea_width' in parsed_json) {
+        feedback_textarea_width = parsed_json["feedback_textarea_width"];
+      }
+      if ('z_index' in parsed_json){
+        z_index = parsed_json["z_index"];
+      }
+    } catch (e) {
+      console.error(`error window_positions parse:`, e);
+    }
+    if (feedback_textarea){
+      feedback_textarea.style.zIndex = z_index;
+      feedback_textarea.style.top = feedback_textarea_top;
+      feedback_textarea.style.width = feedback_textarea_width;
+      if (feedback_textarea_right){
+        feedback_textarea.style.right =  feedback_textarea_right;
+      }
+      if (feedback_textarea_left){
+        feedback_textarea.style.left =  feedback_textarea_left;
+      }
+    }
+    if (speava_all_others){
+      speava_all_others.style.zIndex = z_index;
+      speava_all_others.style.top = elem_others_style_top;
+      if (elem_others_style_right) {
+        speava_all_others.style.right = elem_others_style_right;
+      }
+    }
+    if (fixed_part_of_utterance){
+      fixed_part_of_utterance.style.zIndex = z_index;
+      interim_part_of_utterance.style.zIndex = z_index;
+    }
+    if (notification_area){
+      notification_area.style.zIndex = z_index;
+      notification_area.style.top = notification_area_top;
+      if (notification_area_width){
+        notification_area.style.width = notification_area_width;
+      }
+      if (notification_area_right){
+        notification_area.style.right =  notification_area_right;
+      }
+      if (notification_area_left){
+        notification_area.style.left =  notification_area_left;
+      }
+    }
+    if (buttons_for_command){
+      buttons_for_command.style.top = buttons_style_top;
+      buttons_for_command.style.right = buttons_style_right;
     }
   }
 

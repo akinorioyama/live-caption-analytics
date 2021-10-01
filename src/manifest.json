@@ -6,7 +6,7 @@
     "js": "options.js"
   },
   "description": "Provide routes to send live captions to analytics servers.",
-  "version": "1.0.3.3",
+  "version": "1.0.3.4",
   "icons": {
     "128": "icons/icon.png"
   },
@@ -16,6 +16,7 @@
                 "http://localhost/lca/*",
                 "https://*.jp/*",
                 "https://*.com/*",
+                "https://nativecamp.net/*",
                 "https://*.rarejob.com/*",
                 "https://eikaiwa.dmm.com/*"
     ],
@@ -46,6 +47,7 @@
                    "http://localhost/*",
                    "https://*.jp/*",
                    "https://*.com/*",
+                   "https://nativecamp.net/*",
                    "https://*.rarejob.com/*",
                    "https://eikaiwa.dmm.com/*"
         ]
