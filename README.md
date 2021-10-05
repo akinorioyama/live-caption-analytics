@@ -96,6 +96,7 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20211005|v1.0.3.5|**Major fix**: extension not shown in Google Meet|
 |20211001|v1.0.3.4|**Configuration**: place elements and apply changes immediately<br>**Domains**: add a part of *.net domains|
 |20210928|v1.0.3.3|**Personalization**: change vocabulary to work on<br>**DB filename**: from test.db to main.db<br>minor fixes: refrain from focusing on participant list|
 |20210923|v1.0.3.2|**Configuration**: change session id and text color|

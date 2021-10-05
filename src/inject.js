@@ -1484,7 +1484,7 @@ try {
           document.body.appendChild(dialog);
           dialog.showModal();
           restore_options();
-          document.getElementById('save').addEventListener('click',
+          document.getElementById('speava_option_save').addEventListener('click',
             save_options);
 
             });
@@ -2157,7 +2157,7 @@ try {
         z_index = parsed_json["z_index"];
       }
     } catch (e) {
-      console.error(`error window_positions parse:`, e);
+      console.log(`error window_positions parse:`, e);
     }
     if (feedback_textarea){
       feedback_textarea.style.zIndex = z_index;
@@ -2187,18 +2187,46 @@ try {
       if (notification_area_width){
         notification_area.style.width = notification_area_width;
       }
+      if (!notification_area_right & !notification_area_left){
+        // to shift to right to show as default, if not requested
+        notification_area.style.left = "300px";
+      }
       if (notification_area_right){
         notification_area.style.right =  notification_area_right;
+        notification_area.style.removeProperty("left");
       }
       if (notification_area_left){
         notification_area.style.left =  notification_area_left;
+        notification_area.style.removeProperty("right");
       }
     }
     if (buttons_for_command){
+      buttons_for_command.style.zIndex = z_index;
       buttons_for_command.style.top = buttons_style_top;
       buttons_for_command.style.right = buttons_style_right;
     }
   }
+
+  const setShortcutKeys = (e) => {
+    // no specific positions of elements guarantee the access to configuration button
+    // The shortcut key below ensures access to the option function
+    if (e) {
+      let keycode_to_show_option = 56;
+      try {
+        parsed_json = JSON.parse(speava_session_option_string);
+        if ('keycode' in parsed_json) {
+          keycode_to_show_option = parsed_json["keycode"];
+        }
+      } catch (e) {
+        console.log(`shortcut key option error`,e);
+      }
+      if (e.keyCode === keycode_to_show_option & e.ctrlKey === true) {
+        open_option_dialog();
+      }
+      ;
+    }
+    }
+
 
   ////////////////////////////////////////////////////////////////////////////
   // Main App
@@ -2214,7 +2242,7 @@ try {
   setInterval(tryTo(addButtonLoop, 'adding button'), 500);
   setInterval(sendData,500);
   setInterval(tryTo(fire_notification, 'firing notification'), 500);
-
+  document.addEventListener('keydown',setShortcutKeys);
   ////////////////////////////////////////////////////////////////////////////
   // COLOR, STYLE, and SVG constants
   //
