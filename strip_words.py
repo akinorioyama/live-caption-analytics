@@ -499,8 +499,4 @@ if __name__ == "__main__":
 
     host = arguments["<host>"]
     port = int(arguments["<port>"])
-
-    if port == 443:
-        app.run(debug=False, host=host, port=int(port), ssl_context=('cert.pem','key.pem'))
-    else:
-        app.run(debug=False, host=host, port=int(port))
+    app.run(debug=False, host=host, port=int(port), ssl_context=('cert/cert.pem', 'cert/key.pem'))

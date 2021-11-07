@@ -25,8 +25,12 @@ import numpy as np
 from docopt import docopt
 
 from flask import Flask, request, jsonify,json
+from flask import session as flask_session
+from flask import redirect as flask_redirect
+from flask import url_for as flask_url_for
 from flask_cors import CORS
 from flask import render_template
+import requests
 import pandas as pd
 from vocab_suggest import vocab_calculate_all
 from vocab_suggest import get_stats_for_levels_db
@@ -41,13 +45,35 @@ from save_to_storage import get_delta
 from save_to_storage import get_blending_logs
 from json import JSONDecodeError
 import config_settings
+from  google.oauth2.credentials import Credentials
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+import googleapiclient.discovery
+import os
+
 DB_NAME = "main.db"
 DB_NAME_SITE = "site.db"
 DB_NAME_LOG = "log.db"
+DB_NAME_AUTH = "session_auth.db"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
+
+# This variable specifies the name of a file that contains the OAuth 2.0
+# information for this application, including its client_id and client_secret.
+CLIENT_SECRETS_FILE, config_messsage_text = config_settings.get_value(['oauth','CLIENT_SECRETS_FILE'])
+
+# Note: A secret key is included in the sample so that it works.
+# If you use this code in your application, replace this with a truly secret
+# key. See https://flask.palletsprojects.com/quickstart/#sessions.
+app.secret_key,config_messsage_text = config_settings.get_value(['oauth','SECRET_KEY'])
+
+# This OAuth 2.0 access scope allows for full read/write access to the
+# authenticated user's account and requires requests to use an SSL connection.
+SCOPES = ['https://www.googleapis.com/auth/userinfo.email','openid','https://www.googleapis.com/auth/userinfo.profile']
+API_SERVICE_NAME = 'oauth2'
+API_VERSION = 'v2'
 
 allowed_function_list = ['get_default_sample_1',
                          'get_vacab_acknowledge_use',
@@ -56,7 +82,8 @@ allowed_function_list = ['get_default_sample_1',
                          'get_turn_taking',
                          'get_vocab_frequency',
                          'get_word_per_second',
-                         'get_issued_prompts']
+                         'get_issued_prompts',
+                         'get_all_frozen_captions']
 loaded_vocab_ngsl = pd.read_csv("NGSL+1.txt", delimiter="\t")
 dict_ngsl_level = {row['Lemma']: index for index, row in loaded_vocab_ngsl.iterrows()}
 
@@ -313,7 +340,7 @@ def receive_log():
     return jsonify(data)
 
     return data
-@app.route('/',methods=['POST','GET'])
+@app.route('/livecaption',methods=['POST','GET'])
 def return_heartbeat():
     data = request.get_data().decode('utf-8')
     data_json = json.loads(data)
@@ -325,10 +352,29 @@ def return_heartbeat():
         data = [{"name": "no data exists",
                  "duration": 0}]
         return jsonify( data)
-    # print(data_json)
-    # print(data_json['transcript'])
-    # print(data_json['transcriptId'])
+
     session_string = data_json['transcriptId']
+    google_access_token = data_json['google_access_token']
+
+    userinfo_id = None
+    useremail = None
+    session_id = None
+    # check every n min.
+    if (google_access_token == ""):
+        data['not_authenticated'] = True
+        return jsonify(data)
+
+    if (google_access_token != ""):
+        userinfo_id, useremail = get_authentication_session_settings(username="",
+                                                                     authorization_token=google_access_token)
+        session_id = get_sessionid(session_string=session_string,owner=userinfo_id)
+
+        if session_id is None or session_id == "":
+            data['not_authenticated'] = True
+            return jsonify(data)
+
+        session_string = session_id
+
     print(data_json['transcript'])
     df = pd.DataFrame(data_json['transcript'])
     df.columns = ['dateStart','dateEnd',
@@ -338,6 +384,7 @@ def return_heartbeat():
     df['dif'] = df['end'] - df['start']
     df['session'] = session_string
     df['actor_ip'] = user_ip_address
+    df['actor_account'] = userinfo_id
 
     # if (datetime.datetime.now().second % 4 == 0):
     #     sequence = int(datetime.datetime.now().second / 4) + int(datetime.datetime.now().minute * 60 / 4) + \
@@ -360,7 +407,7 @@ def return_heartbeat():
     #               'yearend', 'monthend', 'dayend', 'hourend', 'minend', 'secend','dif'
     #               ],axis=1,inplace=True)
     # print(df.columns)
-    df.columns=['actor','text','start','end','session','actor_ip']
+    df.columns=['actor','text','start','end','session','actor_ip','actor_account']
     if 'log_incoming_message' in globals():
         if log_incoming_message == "DEBUG":
             df_incoming = df.copy()
@@ -822,6 +869,9 @@ def update_captions_to_db(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,
 @app.route('/render_in_full',methods=['GET'])
 def return_all_results():
 
+    if 'credentials' not in flask_session:
+        return flask_redirect("authorize")
+
     received_session = request.args.get('session')
     session_string = received_session
     data_all = []
@@ -833,11 +883,28 @@ def return_all_results():
                  }
     data = jsonify(data_show)
     data_all.append(data.json)
+
+    google_userid, google_part_of_email = get_user_id_from_session()
+    session_id = get_sessionid(session_string=session_string,owner=google_userid)
+    session_string = session_id
+    if google_userid is None:
+        return flask_redirect("authorize")
+    else:
+        data_show = {"notification": {"text": f"useremail:{google_part_of_email}"},
+                     "heading": "Frequency",
+                     "setting":
+                         {"duration": 500}
+                     }
+        data = jsonify(data_show)
+        data_all.append(data.json)
+
     for function_item in allowed_function_list:
         if function_item == 'get_vocab_coverage':
-            kwargs = {"session_string": session_string, "option_settings": {}}
+            kwargs = {"session_string": session_string, "option_settings": {},
+                      "google_userid": google_userid, "google_part_of_email": google_part_of_email}
         else:
-            kwargs = {"session_string": session_string}
+            kwargs = {"session_string": session_string,
+                      "google_userid": google_userid, "google_part_of_email": google_part_of_email}
 
         data = globals()[function_item](**kwargs)
         data_all.append(data.json)
@@ -858,13 +925,37 @@ def return_notification():
             "setting":{"duration": 2000}
             }
 
+
+    google_access_token = data_json['google_access_token']
+    userinfo_id = None
+    useremail = None
+    session_id = None
+    # check every n min.
+    if (google_access_token == ""):
+        data_show = {"notification": {"text":"Login to Google to start. Press 個 button to start authentication."},
+                 "heading": "no data",
+                 "setting":
+                     {"duration": 2000}
+                 }
+        return jsonify( data_show)
+
+    if (google_access_token != ""):
+        userinfo_id, useremail = get_authentication_session_settings(username="",
+                                                                     authorization_token=google_access_token)
+        session_id = get_sessionid(session_string=session_string,owner=userinfo_id)
+        # session_string = session_string,
+        # userinfo_id = get_user_id(google_access_token)
+    # if userinfo_id is None:
+    # data['not_authenticated'] = True
     data = jsonify(data)
+    # return data
 
     if option_settings != "":
         option_json = json.loads(option_settings)
 
-        data = dynamic_function_call(option_json=option_json,session_string=session_string,
-                                     section="/notification",username=username)
+        data = dynamic_function_call(option_json=option_json,session_string=session_id,
+                                     section="/notification",username=username,
+                                     google_userid = userinfo_id,google_part_of_email = useremail)
 
         if data is not None:
             return data
@@ -873,40 +964,56 @@ def return_notification():
 
     if (datetime.datetime.now().second % 20) <= 1:
 
-        data = get_default_sample_1(session_string=session_string)
+        data = get_default_sample_1(session_string=session_id,
+                                    google_userid = userinfo_id,google_part_of_email = useremail)
 
     elif (1 < (datetime.datetime.now().second % 20) <= 2):
 
-        data = globals()['get_default_sample_1'](session_string=session_string)
+        data = globals()['get_default_sample_1'](session_string=session_id,
+                                                 google_userid = userinfo_id,google_part_of_email = useremail)
 
     elif (2 < (datetime.datetime.now().second % 20) <= 6):
 
-        data = get_vacab_acknowledge_use(session_string=session_string)
+        data = get_vacab_acknowledge_use(session_string=session_id,
+                                         google_userid = userinfo_id,google_part_of_email = useremail)
 
     elif (6 < (datetime.datetime.now().second % 20) <= 10):
 
-        data = get_vacab_sugestion(session_string=session_string)
+        data = get_vacab_sugestion(session_string=session_id,
+                                   google_userid = userinfo_id,google_part_of_email = useremail)
 
     elif (10 < (datetime.datetime.now().second % 20) <= 19):
 
         if (10 < (datetime.datetime.now().second % 20) <= 13):
 
-            data = get_vocab_coverage(session_string=session_string, option_settings=option_json, username=username)
+            data = get_vocab_coverage(session_string=session_id, option_settings=option_json,
+                                      username=username,
+                                      google_userid = userinfo_id,google_part_of_email = useremail)
 
         elif (13 < (datetime.datetime.now().second % 20) <= 15):
 
-            data = get_turn_taking(session_string=session_string)
+            data = get_turn_taking(session_string=session_id,
+                                   google_userid = userinfo_id,google_part_of_email = useremail)
 
         elif (15 < (datetime.datetime.now().second % 20) <= 16):
-            data = get_issued_prompts(session_string=session_string, option_settings=option_json, username=username)
+            data = get_issued_prompts(session_string=session_id, option_settings=option_json,
+                                      username=username,
+                                      google_userid = userinfo_id,google_part_of_email = useremail)
 
         elif (16 < (datetime.datetime.now().second % 20) <= 18):
 
-            data = get_vocab_frequency(session_string=session_string)
+            data = get_vocab_frequency(session_string=session_id,
+                                       google_userid = userinfo_id,google_part_of_email = useremail)
 
-        elif (18 < (datetime.datetime.now().second % 20) <= 19):
+        elif (18 < (datetime.datetime.now().second % 20) <= 18):
 
-            data = get_word_per_second(session_string=session_string)
+            data = get_word_per_second(session_string=session_id,
+                                       google_userid = userinfo_id,google_part_of_email = useremail)
+
+        elif (19 < (datetime.datetime.now().second % 20) <= 19):
+
+            data = get_all_frozen_captions(session_string=session_id,
+                                           google_userid = userinfo_id,google_part_of_email = useremail)
 
     return data
 
@@ -927,33 +1034,57 @@ def return_stat_result():
     option_settings = data_json['option_settings']
     print("username:",username)
     data_return = None
+    google_access_token = data_json['google_access_token']
+
+    if google_access_token == "":
+        data_show = {"notification": {"text": "Login to Google to start. Press 個 button to start authentication."},
+                     "heading": "no data",
+                     "setting":
+                         {"duration": 2000}
+                     }
+        return jsonify(data_show)
+
+    userinfo_id = None
+    useremail = None
+    session_id = None
+    userinfo_id, useremail = get_authentication_session_settings(username="",
+                                                                 authorization_token=google_access_token)
+    session_id = get_sessionid(session_string=session_string, owner=userinfo_id)
+    # session_string = session_string,
+    # userinfo_id = get_user_id(google_access_token)
 
     if option_settings != "":
         option_json = json.loads(option_settings)
 
-        data_return = dynamic_function_call(option_json=option_json, session_string=session_string,
-                                            section="/show",username=username)
+        data_return = dynamic_function_call(option_json=option_json, session_string=session_id,
+                                            section="/show",username=username,
+                                            google_userid = userinfo_id,google_part_of_email = useremail)
 
         if data_return is not None:
             return data_return
     else:
         option_json = {}
 
-    if (datetime.datetime.now().second % 15) <= 5:
+    if (datetime.datetime.now().second % 15) <= 3:
 
-        data_return = get_turn_taking(session_string=session_string)
+        data_return = get_turn_taking(session_string=session_id,
+                                      google_userid = userinfo_id,google_part_of_email = useremail)
 
-    elif 5 < (datetime.datetime.now().second % 15) < 10:
+    elif 3 < (datetime.datetime.now().second % 15) < 6:
 
-        data_return = get_word_per_second(session_string)
+        data_return = get_word_per_second(session_string=session_id,
+                                          google_userid = userinfo_id,google_part_of_email = useremail)
 
-    elif 10 < (datetime.datetime.now().second % 15) < 15:
+    elif 6 < (datetime.datetime.now().second % 15) < 9:
 
-        data_return = get_vocab_frequency(session_string=session_string)
+        data_return = get_vocab_frequency(session_string=session_id,
+                                          google_userid = userinfo_id,google_part_of_email = useremail)
 
     else:
 
-        data_return = get_vocab_coverage(session_string=session_string,option_settings=option_json, username=username)
+        data_return = get_vocab_coverage(session_string=session_id,option_settings=option_json,
+                                         username=username,
+                                         google_userid = userinfo_id,google_part_of_email = useremail)
 
     if data_return is None:
         data_show = {"notification": {"text":"stat result"},
@@ -965,7 +1096,8 @@ def return_stat_result():
 
     return data_return
 
-def dynamic_function_call(option_json={}, session_string="",section="/show",username:str=""):
+def dynamic_function_call(option_json={}, session_string="",section="/show",
+                          username:str="",google_userid:str="",google_part_of_email:str=""):
 
     # sample for option_json - valid
     # option_sample = {"vocab": ["medical", "designated"], "calling_functions": {
@@ -995,9 +1127,13 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",user
                         function_name = function_item['function_name']
                         if function_name in allowed_function_list:
                             if function_name in ['get_vocab_coverage','get_issued_prompts']:
-                                kwargs = {"session_string": session_string, "option_settings": option_json, "username": username}
+                                kwargs = {"session_string": session_string, "option_settings": option_json,
+                                          "username": username,
+                                          "google_userid": google_userid,"google_part_of_email":google_part_of_email }
                             else:
-                                kwargs = {"session_string": session_string}
+                                kwargs = {"session_string": session_string,
+                                          "google_userid": google_userid,
+                                          "google_part_of_email":google_part_of_email }
 
                             data = globals()[function_name](**kwargs)
                             return data
@@ -1027,10 +1163,11 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",user
 
     return None
 
-def get_default_sample_1(session_string=""):
+def get_default_sample_1(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     data = {"notification": {"name": "ヒント:",
-                             "text": '<div class="item" style="word-break:break-word;">他の表現も使ってみましょう</div>'},
+                             "text": f'<div class="item" style="word-break:break-word;">'
+                                     f'{google_part_of_email}さん、他の表現も使ってみましょう</div>'},
             "setting":
                 {"duration": 1000}
             }
@@ -1039,7 +1176,7 @@ def get_default_sample_1(session_string=""):
 
     return data
 
-def get_vacab_acknowledge_use(session_string=""):
+def get_vacab_acknowledge_use(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     share_text = "<div>"
     is_tag_opened = False
@@ -1048,7 +1185,7 @@ def get_vacab_acknowledge_use(session_string=""):
     df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] >= 1) & (df_freq_session['level'] >= "B1")]
 
     df_recent = vocab_calculate_all(session_string=session_string, include_last_record=True)
-    if df_recent is not None:
+    if df_recent is not None and len(df_recent)!=0:
         df_recent = df_recent[df_recent['start'] >= ( df_recent['start'].max() - datetime.timedelta(minutes=1))]
     # recent vocab is not present in the vocab list
     df_freq_session.drop_duplicates(subset=['vocab'], inplace=True)
@@ -1094,7 +1231,7 @@ def get_vacab_acknowledge_use(session_string=""):
 
     return data
 
-def get_vacab_sugestion(session_string=""):
+def get_vacab_sugestion(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     df_caption = vocab_calculate_all(session_string=session_string, since_last_update=False)
     # df_sum = get_stats_for_levels_db(session_string=session_string)
@@ -1228,7 +1365,8 @@ def get_vacab_sugestion(session_string=""):
 
     return data
 
-def get_vocab_coverage(session_string="",option_settings={}, username:str="all"):
+def get_vocab_coverage(session_string="",option_settings={}, username:str="all",
+                       google_userid:str="",google_part_of_email:str=""):
 
     try:
         parsed_option_settings = option_settings
@@ -1307,7 +1445,7 @@ def get_vocab_coverage(session_string="",option_settings={}, username:str="all")
 
     return data_return
 
-def get_vocab_frequency(session_string=""):
+def get_vocab_frequency(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     # last record needs processing after the session close
     if session_string == "%":
@@ -1330,6 +1468,12 @@ def get_vocab_frequency(session_string=""):
                 vocab_result_save(df=df, db_target_name="vocab_aggregate")
 
         df_freq_session = get_frequently_used_words(session=session_string)
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df_start_min_per_session = pd.read_sql("SELECT session, min(start) FROM caption group by session", conn)
+    conn.commit()
+    conn.close()
 
     # df_freq_session = remove_stopwords_entry(df=df_freq_session)
     # "so" is included in stopwords -> no effects... The so could be missing in vocab_aggregate
@@ -1374,6 +1518,7 @@ def get_vocab_frequency(session_string=""):
                       f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
         share_text += '</div>'
 
+    df_all_breakdown = None
     for speaker_index, speaker_item in df_speaker_list.iterrows():
         df_freq_each_speaker =df_freq_session[df_freq_session['actor']==speaker_item['actor']]
         # df_freq_each_speaker TODO: remove duplicate
@@ -1394,7 +1539,29 @@ def get_vocab_frequency(session_string=""):
                           f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
             share_text += '</div>'
 
+        df_freq_each_speaker = df_freq_session[df_freq_session['actor'] == speaker_item['actor']]
+        word_count = df_freq_each_speaker['count(vocab)'].sum()
+        df_freq_each_speaker_group = df_freq_each_speaker.groupby(['level','vocab','session']).sum()
+        df_freq_each_speaker_per_session = df_freq_each_speaker.groupby(['session']).sum()
+        df_freq_each_speaker_per_session = pd.DataFrame(df_freq_each_speaker_per_session.reset_index())
+        df_freq_each_speaker_group = pd.DataFrame(df_freq_each_speaker_group.reset_index())
+        df_freq_each_speaker = df_freq_each_speaker_group
+        df_freq_each_speaker['ngsl'] = pd.Series(
+            [dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_each_speaker['vocab']])
+        df_freq_each_speaker.sort_values(['vocab'], ascending=[False], inplace=True)
+        df_freq_each_speaker['actor'] = str(speaker_item['actor'])
+        df_freq_each_speaker['session_total'] = pd.Series([df_freq_each_speaker_per_session[df_freq_each_speaker_per_session['session'] == a['session']]['count(vocab)'].values[0] for index,a in df_freq_each_speaker.iterrows()])
+        df_freq_each_speaker['session_time'] = pd.Series([df_start_min_per_session[
+                                                               df_start_min_per_session['session'] == a[
+                                                                   'session']]['min(start)'].values[0] for index, a in
+                                                           df_freq_each_speaker.iterrows()])
+        df_freq_each_speaker['session_time'] = pd.to_datetime(df_freq_each_speaker['session_time']).dt.strftime("%Y-%m-%d %H")
 
+        if df_all_breakdown is None:
+            df_all_breakdown = df_freq_each_speaker.copy()
+        else:
+            df_all_breakdown = pd.concat([df_all_breakdown, df_freq_each_speaker])
+    df_all_breakdown.to_csv("all_frequency.txt",sep="\t")
 
     share_text += "</div>"
     data_show = {"notification": {"text": share_text},
@@ -1406,7 +1573,7 @@ def get_vocab_frequency(session_string=""):
 
     return data_return
 
-def get_turn_taking(session_string=""):
+def get_turn_taking(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
@@ -1418,8 +1585,16 @@ def get_turn_taking(session_string=""):
                          {"duration": 2000}
                      }
         return jsonify(data_show)
+    account_control_string = ""
+    # google_userid, google_part_of_email = get_user_id_from_session()
+    # the application shouldn't allow to view any parts of captions without any associated account
+    if (df['actor_account'].isna().sum() == len(df)) or ((df['actor_account']=="").sum() == len(df)):
+        # use account control
+        account_control_string = "Show all for all users"
+    else:
+        account_control_string = f'Show under the userid:{google_userid}/mail:{google_part_of_email}'
     # df.columns = ['id', 'session', 'start', 'end', 'actor', 'text', 'actor_ip']
-    df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text']
+    df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text','actor_account']
     # print("df end",df['end'])
     df['substart'] = pd.to_datetime(df['substart'], format="%Y-%m-%d %H:%M:%S.%f")
     df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
@@ -1447,7 +1622,7 @@ def get_turn_taking(session_string=""):
     sum_all['share_5'].fillna(0, inplace=True)
     sum_all['share'].fillna(0, inplace=True)
 
-    share_text = ''
+    share_text = '<div>' + account_control_string + '<br></div>'
     share_text += '<div style="font-size:24px;">'
     share_text += f'<span style="width:100px;" class="head">Speaker</span>' \
                   f'<span style="width:100px;" class="head">Total</span>' \
@@ -1483,7 +1658,7 @@ def get_turn_taking(session_string=""):
 
     return data_return
 
-def get_word_per_second(session_string=""):
+def get_word_per_second(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
@@ -1498,7 +1673,7 @@ def get_word_per_second(session_string=""):
                  }
         data_return_json = jsonify(data_return)
         return data_return_json
-    df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text']
+    df.columns = ['id', 'session', 'start', 'substart', 'end', 'actor', 'text','actor_account']
     df['substart'] = pd.to_datetime(df['substart'], format="%Y-%m-%d %H:%M:%S.%f")
     df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
     # TODO: allow config -> auto calibrate through the tempo. May need further customization for each individual
@@ -1523,18 +1698,18 @@ def get_word_per_second(session_string=""):
                 index_to_merge = len(list_df_merged_for_shorter_segment) - 1
                 if index_to_merge < 0:
                     index_to_merge = 0
-                if list_df_merged_for_shorter_segment[index_to_merge][7].seconds < 3:
+                if list_df_merged_for_shorter_segment[index_to_merge]['dif'].seconds < 3:
                     # add dif and merge text and word count if two captions are adjacent.
-                    if list_df_merged_for_shorter_segment[index_to_merge][4] != row['start']:
+                    if list_df_merged_for_shorter_segment[index_to_merge]['end'] != row['start']:
                         list_df_merged_for_shorter_segment.append(row)
                     else:
-                        list_df_merged_for_shorter_segment[index_to_merge][4] = row['end']
-                        list_df_merged_for_shorter_segment[index_to_merge][6] = \
-                        list_df_merged_for_shorter_segment[index_to_merge][6] + "/" + row['text']
-                        list_df_merged_for_shorter_segment[index_to_merge][7] = \
-                        list_df_merged_for_shorter_segment[index_to_merge][7] + row['dif']
-                        list_df_merged_for_shorter_segment[index_to_merge][8] = \
-                        list_df_merged_for_shorter_segment[index_to_merge][8] + row['word_count']
+                        list_df_merged_for_shorter_segment[index_to_merge]['end'] = row['end']
+                        list_df_merged_for_shorter_segment[index_to_merge]['text'] = \
+                        list_df_merged_for_shorter_segment[index_to_merge]['text'] + "/" + row['text']
+                        list_df_merged_for_shorter_segment[index_to_merge]['dif'] = \
+                        list_df_merged_for_shorter_segment[index_to_merge]['dif'] + row['dif']
+                        list_df_merged_for_shorter_segment[index_to_merge]['word_count'] = \
+                        list_df_merged_for_shorter_segment[index_to_merge]['word_count'] + row['word_count']
                 else:
                     list_df_merged_for_shorter_segment.append(row)
             else:
@@ -1648,7 +1823,8 @@ def get_word_per_second(session_string=""):
     data = jsonify(data)
     return data
 
-def get_issued_prompts(session_string="",option_settings={}, username:str="all"):
+def get_issued_prompts(session_string="",option_settings={}, username:str="all",
+                       google_userid:str="",google_part_of_email:str=""):
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
@@ -1699,6 +1875,53 @@ def get_issued_prompts(session_string="",option_settings={}, username:str="all")
     data = jsonify(data)
     return data
 
+def get_all_frozen_captions(session_string:str="",google_userid:str="",google_part_of_email:str=""):
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df = pd.read_sql("SELECT * FROM caption where session = '" + session_string + "'", conn)
+    conn.close()
+
+    if len(df) == 0:
+        data_return = {"notification": {"text":f"no data exists for session {session_string}"},
+                 "heading": "All captions",
+                 "setting":
+                     {"duration": 500}
+                 }
+        data_return_json = jsonify(data_return)
+        return data_return_json
+    df.columns = ['id', 'session', 'start', 'end','actor', 'text','actor_ip','actor_account']
+    df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
+
+    df.sort_values(['start'], inplace=True)
+    list_actors = [ a[0] for a in df.groupby(["actor"]).groups.items()]
+    df_all = None
+
+    share_text = '<div>'
+    share_text += f'<span style="width:64px;font-size:12px;"  class="head">clock</span>'
+    #TODO allow config
+    is_to_display_speaker_only = False
+    if is_to_display_speaker_only == True:
+        is_to_display_speaker_only = True
+    else:
+        share_text += f'<span style="width:100px;font-size:12px;"  class="head">Speaker</span>'
+    share_text += f'<span style="width:600px;font-size:12px;"  class="head">text</span>' \
+                  f'</div>'
+    for index, row in df.iterrows():
+        share_text += '<div style="font-size:12px;">'
+        share_text += f'<span style="width:64px;font-size:12px;" class="item">{row["start"].strftime("%M:%S")}</span>' \
+                      f'<span style="width:100px;font-size:12px;" class="item">{row["actor"]}</span>' \
+                      f'<span style="width:600px;font-size:12px;" class="item">{row["text"]}</span>'
+        share_text += '</div>'
+    data = {"notification": {"text":share_text},
+             "heading": "all frozen",
+             "setting":
+                 {"duration": 500}
+             }
+    data = jsonify(data)
+    return data
+
 
 def get_session_settings(username:str="",session_string:str=""):
 
@@ -1723,6 +1946,478 @@ def get_session_settings(username:str="",session_string:str=""):
             return df_session_vocab_to_cover,df_session_vocab_to_suggest,df_session_vocab_to_avoid
 
     return None, None, None
+
+def get_sessionid(session_string:str="",owner:str=""):
+
+    if session_string == "" or owner == "":
+        return None
+
+    session_id = None
+    try:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+
+        df_session_internal_code = pd.read_sql("SELECT * from session_internal_code where"
+                                               " external_session_name = '" + session_string + "'"
+                                               " and owner = '" + owner + "'"
+                                               , conn)
+        conn.close()
+        if len(df_session_internal_code) == 0:
+            dbname = DB_NAME
+            conn = sqlite3.connect(dbname)
+            conn.close()
+            df_new = pd.DataFrame(
+                columns=['external_session_name', 'owner'])
+            tmp_se = pd.Series({
+                'external_session_name': session_string,
+                'owner': owner,
+            }, index=df_new.columns)
+            df_new = df_new.append(tmp_se, ignore_index=True)
+
+            dbname = DB_NAME
+            conn = sqlite3.connect(dbname)
+            df_new.to_sql('session_internal_code', conn, if_exists='append', index=False)
+            conn.commit()
+            df_session_id_created = pd.read_sql("SELECT * from session_internal_code where"
+                                                   " external_session_name = '" + session_string + "'"
+                                                   " and owner = '" + owner + "'"
+                                                   , conn)
+            conn.close()
+            if len(df_session_id_created) == 0:
+                print(f"error in creating session name{session_string} for {owner}")
+                return None
+            else:
+                session_id = df_session_id_created['session_id'].values[0]
+        else:
+            session_id = df_session_internal_code['session_id'].values[0]
+        session_id = str(session_id)
+        return session_id
+
+    except Exception as e:
+        print(f"error in retrieving sessionname{session_string} for {owner}")
+        return None
+
+def set_authentication_session_settings(username:str="",
+                                        # session_string:str="",
+                                        authorization_token:str="",
+                                        expires_at:str="",account_mail:str=""):
+    # session_string == "" or \
+    if username == "" or \
+       authorization_token == "" or \
+       expires_at == "":
+        return False
+    df_session_auth = None
+    base_time = datetime.datetime.now()
+    account_check_in_sec = 600
+    intime_str = base_time.strftime("%Y-%m-%d %H:%M:%S")
+    intime_str = expires_at
+    int_expire_time = base_time + datetime.timedelta(seconds=account_check_in_sec)
+    int_expire_time_str = int_expire_time.strftime("%Y-%m-%d %H:%M:%S")
+    df_new = pd.DataFrame(columns=['auth_token', 'session','account', 'expire_at', 'internally_expire_at','account_mail'])
+    tmp_se = pd.Series({
+        'auth_token': authorization_token,
+        # 'session': session_string,
+        'account': username,
+        'account_mail': account_mail,
+        'expire_at': intime_str,
+        'internally_expire_at': int_expire_time_str,
+    }, index=df_new.columns)
+    df_new = df_new.append(tmp_se, ignore_index=True)
+
+    # if session_string is not None:
+    dbname = DB_NAME_AUTH
+    conn = sqlite3.connect(dbname)
+    df_new.to_sql('session_auth_mapping', conn, if_exists='append', index=False)
+    conn.close()
+
+    return True
+
+# def get_authentication_session_settings(username:str="",session_string:str="",authorization_token:str=""):
+def get_authentication_session_settings(username:str="",authorization_token:str=""):
+
+    df_session_auth = None
+    authenticated_userid = None
+    base_time = datetime.datetime.now()
+
+    # if session_string is not None:
+    dbname = DB_NAME_AUTH
+    conn = sqlite3.connect(dbname)
+
+    df_session_auth = pd.read_sql("SELECT * from session_auth_mapping where"
+                                  # " session = '" + session_string + "'"                                      
+                                  " auth_token = '" + authorization_token + "'", conn)
+    conn.commit()
+    conn.close()
+
+    if len(df_session_auth) == 0:
+        # initiate to retrieve the userid
+        userinfo, account_email, expires_at, expires_in = get_user_id(token=authorization_token)
+        if userinfo is not None:
+            set_authentication_session_settings(authorization_token=authorization_token,username=userinfo,
+                                                expires_at=expires_at,
+                                                account_mail=account_email)
+            # session_string=session_string,
+            print("retrieve id")
+        else:
+            return [None,None]
+        authenticated_userid = userinfo
+    else:
+        df_session_auth['expire_at'] = pd.to_datetime(df_session_auth['expire_at'])
+        df_session_auth['internally_expire_at'] = pd.to_datetime(df_session_auth['internally_expire_at'])
+        exp_time_max = df_session_auth['expire_at'].max()
+        int_exp_max = df_session_auth['internally_expire_at'].max()
+        if (base_time > int_exp_max):
+            # initiate to retrieve the userid
+            # delete
+            dbname = DB_NAME_AUTH
+            conn = sqlite3.connect(dbname)
+            for index, row in df_session_auth.iterrows():
+                conn.execute("DELETE FROM session_auth_mapping where " + \
+                                     "id = '" + str(row['id']) + "'")
+            conn.commit()
+            conn.close()
+
+            userinfo, account_email, expires_at, expires_in = get_user_id(token=authorization_token)
+            if userinfo is not None:
+                set_authentication_session_settings(authorization_token=authorization_token, username=userinfo,
+                                                    expires_at=expires_at,
+                                                    account_mail=account_email)
+                # session_string=session_string,
+                authenticated_userid = userinfo
+            else:
+                authenticated_userid = None
+        elif (base_time > exp_time_max):
+            authenticated_userid = None
+            account_email = None
+        else: #still active
+            authenticated_userid = df_session_auth['account'].values[0]
+            account_email = df_session_auth['account_mail'].values[0]
+
+    return authenticated_userid, account_email
+
+def get_browser_session_authentication():
+
+    userid = None
+    given_name = None
+    email = None
+
+    if 'credentials' not in flask_session:
+        return flask_redirect('authorize')
+
+    # Load credentials from the session.
+    credentials = google.oauth2.credentials.Credentials(
+        **flask_session['credentials'])
+
+    userinfo_service = googleapiclient.discovery.build(
+        API_SERVICE_NAME, API_VERSION, credentials=credentials)
+
+    try:
+        exe_info = userinfo_service.userinfo().get().execute()
+        userid = exe_info['id']
+        given_name = exe_info['given_name']
+        email_raw = exe_info['email']
+        email = mask_email_address(email_raw)
+    except Exception as e:
+        print('An error occurred: %s', e)
+        return flask_redirect('authorize')
+    # files = drive.files().list().execute()
+
+    # Save credentials back to session in case access token was refreshed.
+    # ACTION ITEM: In a production app, you likely want to save these
+    #              credentials in a persistent database instead.
+    flask_session['credentials'] = credentials_to_dict(credentials)
+
+    # expires_in_result = requests.post('https://www.googleapis.com/oauth2/v3/tokeninfo?',
+    #                        params={'access_token': token},
+    #                        headers={'content-type': 'application/x-www-form-urlencoded'})
+    #
+    # status_code = getattr(expires_in_result, 'status_code')
+    # if status_code == 200:
+    #     expires_in = int(expires_in_result.json()['expires_in'])
+    #     expires_at = datetime.datetime.fromtimestamp(int(expires_in_result.json()['exp']))
+    #
+
+    return userid, given_name, email
+
+@app.route('/',methods=['POST','GET'])
+def toppage():
+
+    userid = None
+    given_name = None
+    email = None
+    userid, given_name, email = get_browser_session_authentication()
+    kwargs = {"userid" : userid, "given_name" : given_name, "email": email}
+    text = render_template('lca_toppage.html',**kwargs )
+    return text
+
+
+@app.route('/index')
+def index():
+
+    userid = None
+    given_name = None
+    email = None
+    userid, given_name, email = get_browser_session_authentication()
+    kwargs = {"userid" : userid, "given_name" : given_name, "email": email}
+
+    text = render_template('lca_index.html', **kwargs)
+    return text
+    # return print_index_table()
+
+@app.route('/lca/sample_speaking_session',methods=['POST','GET'])
+def return_session_template_to_test():
+    text = render_template('sample_speaking_session.html')
+    return text
+
+@app.route('/lca_status/sample_session_copy',methods=['POST','GET'])
+def return_session_copy():
+    text = render_template('show_session_copy.html')
+    return text
+
+
+@app.route('/test')
+def test_api_request():
+  if 'credentials' not in flask_session:
+    return flask_redirect('authorize')
+
+  # Load credentials from the session.
+  credentials = google.oauth2.credentials.Credentials(
+      **flask_session['credentials'])
+
+  userinfo_service = googleapiclient.discovery.build(
+      API_SERVICE_NAME, API_VERSION, credentials=credentials)
+
+  try:
+    exe_info = userinfo_service.userinfo().get().execute()
+    userid = exe_info['id']
+    given_name = exe_info['given_name']
+    email_raw = exe_info['email']
+    email = mask_email_address(email_raw)
+  except Exception as e:
+      print('An error occurred: %s', e)
+      return flask_redirect('authorize')
+  # files = drive.files().list().execute()
+
+  # Save credentials back to session in case access token was refreshed.
+  # ACTION ITEM: In a production app, you likely want to save these
+  #              credentials in a persistent database instead.
+  flask_session['credentials'] = credentials_to_dict(credentials)
+
+  kwargs = {"userid": userid, "given_name": given_name, "email": email}
+
+  text = render_template('lca_toppage.html', **kwargs)
+  return text
+
+
+@app.route('/authorize')
+def authorize():
+  # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps.
+  flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+      CLIENT_SECRETS_FILE, scopes=SCOPES)
+
+  # The URI created here must exactly match one of the authorized redirect URIs
+  # for the OAuth 2.0 client, which you configured in the API Console. If this
+  # value doesn't match an authorized URI, you will get a 'redirect_uri_mismatch'
+  # error.
+  flow.redirect_uri = flask_url_for('oauth2callback', _external=True)
+
+  authorization_url, state = flow.authorization_url(
+      # Enable offline access so that you can refresh an access token without
+      # re-prompting the user for permission. Recommended for web server apps.
+      access_type='offline',
+      # Enable incremental authorization. Recommended as a best practice.
+      include_granted_scopes='true')
+
+  # Store the state so the callback can verify the auth server response.
+  flask_session['state'] = state
+
+  return flask_redirect(authorization_url)
+
+@app.route('/oauth2callback')
+def oauth2callback():
+  # Specify the state when creating the flow in the callback so that it can
+  # verified in the authorization server response.
+  state = flask_session['state']
+
+  flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
+      CLIENT_SECRETS_FILE, scopes=SCOPES, state=state)
+  flow.redirect_uri = flask_url_for('oauth2callback', _external=True)
+
+  # Use the authorization server's response to fetch the OAuth 2.0 tokens.
+  authorization_response = request.url
+  flow.fetch_token(authorization_response=authorization_response)
+
+  # Store credentials in the session.
+  # ACTION ITEM: In a production app, you likely want to save these
+  #              credentials in a persistent database instead.
+  credentials = flow.credentials
+  flask_session['credentials'] = credentials_to_dict(credentials)
+
+  return flask_redirect(flask_url_for('test_api_request'))
+
+
+@app.route('/revoke')
+def revoke():
+  if 'credentials' not in flask_session:
+    return ('You need to <a href="/authorize">authorize</a> before ' +
+            'testing the code to revoke credentials.')
+
+  credentials = google.oauth2.credentials.Credentials(
+    **flask_session['credentials'])
+
+  revoke = requests.post('https://oauth2.googleapis.com/revoke',
+      params={'token': credentials.token},
+      headers = {'content-type': 'application/x-www-form-urlencoded'})
+
+  status_code = getattr(revoke, 'status_code')
+  string_to_home = '<br><a href="/index">Go back to start page</a>'
+  if status_code == 200:
+    return('Credentials successfully revoked.' + string_to_home)
+  else:
+    return('An error occurred.' + string_to_home)
+
+@app.route('/clear')
+def clear_credentials():
+  if 'credentials' in flask_session:
+    del flask_session['credentials']
+  string_to_home = '<br><a href="/index">Go back to start page</a>'
+  return ('Credentials have been cleared.<br><br>' +
+          string_to_home)
+
+
+def credentials_to_dict(credentials):
+  return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
+
+# def print_index_table():
+#   return ('<table>' +
+#           '<tr><td><a href="/test">Test an API request</a></td>' +
+#           '<td>Submit an API request and see a formatted JSON response. ' +
+#           '    Go through the authorization flow if there are no stored ' +
+#           '    credentials for the user.</td></tr>' +
+#           '<tr><td><a href="/authorize">Test the auth flow directly</a></td>' +
+#           '<td>Go directly to the authorization flow. If there are stored ' +
+#           '    credentials, you still might not be prompted to reauthorize ' +
+#           '    the application.</td></tr>' +
+#           '<tr><td><a href="/revoke">Revoke current credentials</a></td>' +
+#           '<td>Revoke the access token associated with the current user ' +
+#           '    session. After revoking credentials, if you go to the test ' +
+#           '    page, you should see an <code>invalid_grant</code> error.' +
+#           '</td></tr>' +
+#           '<tr><td><a href="/clear">Clear Flask session credentials</a></td>' +
+#           '<td>Clear the access token currently stored in the user session. ' +
+#           '    After clearing the token, if you <a href="/test">test the ' +
+#           '    API request</a> again, you should go back to the auth flow.' +
+#           '</td></tr></table>')
+
+def get_user_id_from_session():
+    import google.oauth2.credentials
+    import google_auth_oauthlib.flow
+    import googleapiclient.discovery
+    API_SERVICE_NAME = 'oauth2'
+    API_VERSION = 'v2'
+
+    if 'credentials' not in flask_session:
+        return [None, None]
+    # Load credentials from the session.
+    creds = google.oauth2.credentials.Credentials(
+        **flask_session['credentials'])
+
+    userinfo_service = googleapiclient.discovery.build(
+      API_SERVICE_NAME, API_VERSION, credentials=creds)
+
+    userinfo = None
+    account_email = None
+    try:
+        userinfo = userinfo_service.userinfo().get().execute()['id']
+        useremail= userinfo_service.userinfo().get().execute()['email']
+        account_email = mask_email_address(useremail=useremail)
+    except Exception as e:
+        print('An error occurred: %s', e)
+        if (e.args[1]['error'] == "invalid_grant"):
+            return None
+    # Save credentials back to session in case access token was refreshed.
+    # ACTION ITEM: In a production app, you likely want to save these
+    #              credentials in a persistent database instead.
+    flask_session['credentials'] = credentials_to_dict(creds)
+
+    return userinfo, account_email
+
+
+
+def get_user_id(token:str=""):
+    if token == "":
+        return [None, None, None, None]
+    import google.oauth2.credentials
+    import google_auth_oauthlib.flow
+    import googleapiclient.discovery
+    API_SERVICE_NAME = 'oauth2'
+    API_VERSION = 'v2'
+    # Load credentials from the session.
+    # credentials = google.oauth2.credentials.Credentials(
+    #     **flask_session['credentials'])
+
+    # authenticated_userid = get_authentication_session_settings(username="",session_string="",authorization_token=token)
+
+    creds = Credentials(token)
+    userinfo_service = googleapiclient.discovery.build(
+      API_SERVICE_NAME, API_VERSION, credentials=creds)
+
+    expires_in_result = requests.post('https://www.googleapis.com/oauth2/v3/tokeninfo?',
+                           params={'access_token': token},
+                           headers={'content-type': 'application/x-www-form-urlencoded'})
+
+    status_code = getattr(expires_in_result, 'status_code')
+    if status_code == 200:
+        expires_in = int(expires_in_result.json()['expires_in'])
+        expires_at = datetime.datetime.fromtimestamp(int(expires_in_result.json()['exp']))
+    else:
+        expires_in = None
+        expires_at = None
+        print("Not valid access token")
+
+    userid = None
+    useremail = None
+    account_email = None
+    try:
+        exe_result = userinfo_service.userinfo().get().execute()
+        userid = exe_result['id']
+        useremail = exe_result['email']
+        # userid = userinfo_service.userinfo().get().execute()['id']
+        # useremail = userinfo_service.userinfo().get().execute()['email']
+        account_email = mask_email_address(useremail=useremail)
+        # account_email = useremail.split('@')[0][0] + "(not stored)" + \
+        #                 useremail.split('@')[0][-2:]
+        useremail = None
+    except Exception as e:
+      print('An error occurred: %s', e)
+      useremail = None
+    # Save credentials back to session in case access token was refreshed.
+    # ACTION ITEM: In a production app, you likely want to save these
+    #              credentials in a persistent database instead.
+    flask_session['credentials'] = credentials_to_dict(creds)
+
+    return userid, account_email, expires_at, expires_in
+
+def mask_email_address(useremail:str=""):
+    if useremail != "":
+        account_email = useremail.split('@')[0][0] + "(not stored)" + \
+                        useremail.split('@')[0][-2:]
+    else:
+        account_email = "No email provided"
+    return account_email
+
+def credentials_to_dict(credentials):
+  return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
 
 def insert_incoming_log(df:pd.DataFrame):
 
@@ -1770,7 +2465,8 @@ def create_db():
         'end DATETIME(6), '
         'actor VARCHAR(30),'
         'text MESSAGE_TEXT,'
-        'actor_ip VARCHAR(60) )')
+        'actor_ip VARCHAR(60),'
+        'actor_account VARCHAR(60) )')
     cur.execute(
         'CREATE TABLE IF NOT EXISTS caption_sub ('         
         '	id INTEGER,'
@@ -1780,6 +2476,7 @@ def create_db():
         '	end	DATETIME(6),'
         '	actor VARCHAR(30),'
         '	text MESSAGE_TEXT,'
+        '   actor_account VARCHAR(60), '        
         '	PRIMARY KEY("id" AUTOINCREMENT) );')
     cur.execute(
         'CREATE TABLE IF NOT EXISTS log(id INTEGER PRIMARY KEY AUTOINCREMENT, '
@@ -1839,6 +2536,22 @@ def create_db():
     conn.commit()
     conn.close()
 
+    dbname = DB_NAME_AUTH
+    conn = sqlite3.connect(dbname)
+    cur = conn.cursor()
+
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS session_auth_mapping('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'session VARHAR(40),'        
+        'auth_token VARCHAR(128),'
+        'account VARCHAR(60),'
+        'expire_at DATETIME(6),'
+        'internally_expire_at DATETIME(6),'
+        'account_mail VARCHAR(20)'
+    )
+    conn.commit()
+    conn.close()
 
 if __name__ == "__main__":
 
@@ -1848,9 +2561,9 @@ if __name__ == "__main__":
     port = int(arguments["<port>"])
     log_incoming_message =  arguments["<debug>"]
     create_db()
-    # insert_db()
-    # check_table()
-    if port == 443:
-        app.run(debug=False, host=host, port=int(port), ssl_context=('cert.pem','key.pem'))
-    else:
-        app.run(debug=False, host=host, port=int(port))
+    # When running locally, disable OAuthlib's HTTPs verification.
+    # ACTION ITEM for developers:
+    #     When running in production *do not* leave this option enabled.
+    # os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+    app.run(debug=False, host=host, port=int(port), ssl_context = ('cert/cert.pem', 'cert/key.pem'))
