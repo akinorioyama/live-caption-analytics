@@ -386,7 +386,9 @@ def personalize_for_session_vocab(session_string:str="",email_part:str=""):
     kwargs = {"outside_form": outside_form_value }
 
     df_resource_list = get_resource_list()
-    df_resource_list['id_checked'] = ""
+
+    if df_resource_list is not None:
+        df_resource_list['id_checked'] = ""
     button_command_value = request.form.get("command",None)
     # session_string_str = request.form.get("session_id",None)
 
@@ -410,19 +412,20 @@ def personalize_for_session_vocab(session_string:str="",email_part:str=""):
 
     df_new = None
     df_new_domain = None
-    for index, row in df_resource_list.iterrows():
-        if row['id_checked'] != "checked":
-            continue
-        df_site_text = read_from_storage(None, row['id'])
-        df_site_text_json =  df_site_text['text_in_json'][0]
-        text = json.loads(df_site_text_json)
-        df = pd.DataFrame(text)
-        df.columns=['text']
-        if df_new is None:
-            df_new = create_new_df_for_word_list(df)
-        else:
-            df_to_add = create_new_df_for_word_list(df)
-            df_new = pd.concat([df_new,df_to_add])
+    if df_resource_list is not None:
+        for index, row in df_resource_list.iterrows():
+            if row['id_checked'] != "checked":
+                continue
+            df_site_text = read_from_storage(None, row['id'])
+            df_site_text_json =  df_site_text['text_in_json'][0]
+            text = json.loads(df_site_text_json)
+            df = pd.DataFrame(text)
+            df.columns=['text']
+            if df_new is None:
+                df_new = create_new_df_for_word_list(df)
+            else:
+                df_to_add = create_new_df_for_word_list(df)
+                df_new = pd.concat([df_new,df_to_add])
 
     if text_to_be_parsed != "":
         df = pd.DataFrame([text_to_be_parsed])
@@ -434,6 +437,8 @@ def personalize_for_session_vocab(session_string:str="",email_part:str=""):
             df_new = pd.concat([df_new,df_to_add])
 
     if df_new is None:
+        if df_resource_list is None:
+            df_resource_list = pd.DataFrame()
         kwargs['df_resource_list'] = df_resource_list
         kwargs["df_list_c1"] = pd.DataFrame()
         vocab_string = ""
