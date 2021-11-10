@@ -41,7 +41,10 @@ try {
   // let currentSpeakerIndex = null;
 
   let speava_session_id = "";
-
+  let speava_access_token_openid = "";
+  let speava_access_token_validuntil = null;
+  let isLoggedIn = false;
+  let token_expire_interval = null;
   // -------------------------------------------------------------------------
   // CACHE is an array of speakers and comments
   //
@@ -102,6 +105,7 @@ try {
   let speava_server_url_to_post = "http://localhost:5000";
   let speava_server_username = "test user";
   let speava_session_log_string = "Wonder,Mistake"
+  let speava_oauth_client_id = "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
   let version = 1;
   // language check
   let language_setting_browser = window.navigator.language;
@@ -115,7 +119,7 @@ try {
   let speava_session_option_string;
   let speava_session_window_positions;
   let speava_session_text_color;
-
+  const ID_TOGGLE_BUTTON_LOGIN = '__lca-login-icon';
   const hostname_for_adhoc = document.location.hostname;
 
   let SpeechRecognition;
@@ -316,7 +320,8 @@ try {
       speava_session_option_string: null,
       speava_session_window_positions: null,
       speava_session_text_color: "",
-      speava_session_id: ""
+      speava_session_id: "SessionName",
+      speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
     }, (items) => {
         // resolve(is_synced = true);
         is_synced = true
@@ -339,6 +344,7 @@ try {
         speava_session_window_positions =     items.speava_session_window_positions;
         speava_session_text_color =           items.speava_session_text_color;
         speava_session_id =                   items.speava_session_id;
+        speava_oauth_client_id =              items.speava_oauth_client_id;
         currentTranscriptId = speava_session_id;
         let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
         SPEAKER_NAME_MAP = obj;
@@ -365,7 +371,8 @@ try {
       speava_session_option_string: "",
       speava_session_window_positions: "",
       speava_session_text_color: "",
-      speava_session_id: ""
+      speava_session_id: "SessionName",
+      speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
     }, function(items) {
       speava_server_url_to_record = items.speava_session_record;
       speava_server_url_to_post = items.speava_session_spreadsheet_post;
@@ -381,6 +388,7 @@ try {
       speava_session_window_positions =     items.speava_session_window_positions;
       speava_session_text_color =           items.speava_session_text_color;
       speava_session_id =                   items.speava_session_id;
+      speava_oauth_client_id =              items.speava_oauth_client_id;
       let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
       SPEAKER_NAME_MAP = obj;
       currentTranscriptId = speava_session_id;
@@ -1233,6 +1241,19 @@ try {
                 setTimeout(function() {
                     speava_async_response_show = null;
                 },time_length);
+                if ('not_authenticated' in json_text){
+                  if (json_text.not_authenticated === true){
+                    open_auth_dialog("clear");
+                    isLoggedIn = false;
+                    const msg_string_auth = chrome.i18n.getMessage("oauth_not_verified_on_server");
+                    const json_options_auth = {
+                      heading: msg_string_auth,//i18n "Authenticatation is not verified on server. You need to authenticate again. Authenticate yourself?"
+                      prompt_options: "Yes",
+                      setting: {duration:2500}
+                    }
+                    PromptGeneric(json_options_auth);
+                  }
+                }
             }
         });
         // speava_async_response_show = null;
@@ -1270,6 +1291,20 @@ try {
                 dialog.classList.remove('display_dialog');
                 speava_async_response_notification = null;
               },time_length);
+            if ('not_authenticated' in json_text){
+              if (json_text.not_authenticated === true){
+                open_auth_dialog("clear");
+                isLoggedIn = false;
+                const msg_string_auth = chrome.i18n.getMessage("oauth_not_verified_on_server");
+                const json_options_auth = {
+                  heading: msg_string_auth,//i18n "Authenticatation is not verified on server. You need to authenticate again. Authenticate yourself?"
+                  prompt_options: "Yes",
+                  setting: {duration:2500}
+                }
+                PromptGeneric(json_options_auth);
+
+              }
+            }
         });
         // speava_async_response_notification = null;
     };
@@ -1361,7 +1396,8 @@ try {
         date: dateString,
         transcriptId: currentTranscriptId,
         username: speava_server_username,
-        option_settings: speava_session_option_string
+        option_settings: speava_session_option_string,
+        google_access_token: speava_access_token_openid
       }
       speava_async_response_log = fetch(speava_server_url_to_record + "/log",
           {
@@ -1377,7 +1413,6 @@ try {
       //console.log('catch', e);
     }
   }
-
 
   const open_option_dialog = () => {
     if (chrome.runtime.openOptionsPage) {
@@ -1409,6 +1444,7 @@ try {
             speava_session_window_positions = document.getElementById('speava_session_window_positions').value;
             speava_session_id = document.getElementById('speava_session_id').value;
             speava_session_text_color = document.getElementById('speava_session_text_color').value;
+            speava_oauth_client_id = document.getElementById('speava_oauth_client_id').value;
             currentTranscriptId = speava_session_id;
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
@@ -1431,7 +1467,8 @@ try {
               speava_session_option_string: speava_session_option_string,
               speava_session_window_positions: speava_session_window_positions,
               speava_session_id: speava_session_id,
-              speava_session_text_color: speava_session_text_color
+              speava_session_text_color: speava_session_text_color,
+              speava_oauth_client_id: speava_oauth_client_id
             }, function() {
               // Update status to let user know options were saved.
               let optional_buttons = document.getElementById('optional_buttons');
@@ -1462,8 +1499,9 @@ try {
               speava_session_prompt: false,
               speava_session_option_string: "",
               speava_session_window_positions: "",
-              speava_session_id: "",
-              speava_session_text_color: ""
+              speava_session_id: "SessionName",
+              speava_session_text_color: "",
+              speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
             }, function(items) {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -1479,6 +1517,7 @@ try {
               document.getElementById('speava_session_window_positions').value = items.speava_session_window_positions;
               document.getElementById('speava_session_id').value = items.speava_session_id;
               document.getElementById('speava_session_text_color').value = items.speava_session_text_color;
+              document.getElementById('speava_oauth_client_id').value = items.speava_oauth_client_id;
             });
           }
           document.body.appendChild(dialog);
@@ -1512,7 +1551,8 @@ try {
         let obj = {
           transcriptId: currentTranscriptId,
           username: speava_server_username,
-          option_settings: speava_session_option_string
+          option_settings: speava_session_option_string,
+          google_access_token: speava_access_token_openid
         }
         url = speava_server_url_to_record + "/notification"
         speava_async_response_notification = fetch(url,
@@ -1522,6 +1562,9 @@ try {
               body: JSON.stringify(obj)
             });
         speava_async_response_notification.then(processReceivedReplyNotification).catch(error => {
+          if (error.name === "TypeError" ){
+            show_unavailable_error("speava_session_notification");
+          }
           speava_async_response_notification = null;
         });
       } catch (e) {
@@ -1531,7 +1574,11 @@ try {
 
     }
   }
-
+  const show_unavailable_error = (element_id_of_area) => {
+    let dialog = document.getElementById(element_id_of_area);
+    const not_available_message = chrome.i18n.getMessage("server_not_reached_with_errors",speava_server_url_to_record);
+    dialog.innerHTML = not_available_message;
+  }
   // -------------------------------------------------------------------------
   // Send data according to screens and settings
   //
@@ -1594,7 +1641,8 @@ try {
               let obj = {
                 transcriptId: currentTranscriptId,
                 username: speava_server_username,
-                option_settings: speava_session_option_string
+                option_settings: speava_session_option_string,
+                google_access_token: speava_access_token_openid
               }
               speava_async_response_prompt = fetch(speava_server_url_to_record + "/prompt_check",
                   {
@@ -1629,7 +1677,8 @@ try {
               let obj = {
                 transcriptId: currentTranscriptId,
                 username: speava_server_username,
-                option_settings: speava_session_option_string
+                option_settings: speava_session_option_string,
+                google_access_token: speava_access_token_openid
               }
               speava_async_response_show = fetch(speava_server_url_to_record + "/show",
                   {
@@ -1639,7 +1688,9 @@ try {
                     cache: "no-cache"
                   });
               speava_async_response_show.then(processReceivedReplyShow).catch(error => {
-                //console.log("int catch",error);
+                if (error.name === "TypeError" ){
+                  show_unavailable_error("speava_textarea");
+                }
                 speava_async_response_show = null;
               });
             } catch (e) {
@@ -1666,9 +1717,10 @@ try {
               transcript: transcript_text,
               transcriptId: currentTranscriptId,
               username: speava_server_username,
-              option_settings: speava_session_option_string
+              option_settings: speava_session_option_string,
+              google_access_token: speava_access_token_openid
             }
-            speava_async_response = fetch(speava_server_url_to_record,
+            speava_async_response = fetch(speava_server_url_to_record + "/livecaption",
                 {
                   method: "POST",
                   mode: "cors",
@@ -1874,9 +1926,25 @@ try {
       buttons.style.position = 'absolute';
       objBody_buttons.appendChild(buttons);
 
+      const login_text = document.createElement('div');
+      login_text.style.display = 'flex';
+      login_text.style.position = 'relative';
+      login_text.style.float = 'left';
+      login_text.id = "speava_valid_thru";
+      login_text.style.font.fontcolor(speava_session_text_color);
+      buttons.prepend(login_text);
+
+      const toggleButton_login = document.createElement('div');
+      toggleButton_login.style.display = 'flex';
+      toggleButton_login.style.position = 'relative';
+      toggleButton_login.style.float = 'left';
+      toggleButton_login.onclick = tryTo(toggleLogin, 'toggling grid login');
+      buttons.prepend(toggleButton_login);
+
       const toggleButton = document.createElement('div');
       toggleButton.style.display = 'flex';
       toggleButton.style.position = 'relative';
+      toggleButton.style.float = 'left';
       toggleButton.onclick = tryTo(toggleTranscribing, 'toggling grid');
       buttons.prepend(toggleButton);
 
@@ -1886,6 +1954,7 @@ try {
       const url_icon_delete = chrome.runtime.getURL("icons/icon_delete.png");
       const url_icon_record = chrome.runtime.getURL("icons/icon_record.png");
       const url_icon_log = chrome.runtime.getURL("icons/icon_log.png");
+      const url_icon_login = chrome.runtime.getURL("icons/icon_login.png");
 
       const reactionFocus_log_action = () => log_action(currentTranscriptId);
       const open_options = () => open_option_dialog();
@@ -1913,6 +1982,13 @@ try {
         path: url_icon_log,
       };
 
+      const _PNG_LOGIN = {
+        viewBoxWidth: 512,
+        viewBoxHeight: 512,
+        path: url_icon_login,
+      };
+
+      toggleButton_login.appendChild(makePng(_PNG_LOGIN, 36, 36, { id: ID_TOGGLE_BUTTON_LOGIN }));
       toggleButton.appendChild(makePng(_PNG_RECORD, 36, 36, { id: ID_TOGGLE_BUTTON }));
 
       const deleteButton = document.createElement('div');
@@ -2047,6 +2123,18 @@ try {
         return;
       }
     }
+    if (speava_access_token_openid==="") {
+      const msg_string_auth = chrome.i18n.getMessage("oauth_not_authenticated");
+      document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.remove('on');
+      document.getElementById("speava_valid_thru").innerText = msg_string_auth;  //"Not authenticated";
+    } else {
+      document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+      let auth_valid_until = new Date(speava_access_token_validuntil);
+      let auth_valid_text ;
+      const msg_string_auth = chrome.i18n.getMessage("oauth_valid_thru");
+      auth_valid_text = String(auth_valid_until.getMinutes()) + ":" + String(auth_valid_until.getSeconds())
+      document.getElementById("speava_valid_thru").innerText = msg_string_auth + auth_valid_text ; // "Authenticated until "
+    }
 
   };
 
@@ -2073,6 +2161,8 @@ try {
     const speava_all_others = document.getElementById("speava_all_others");
     const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
     const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
+    const speava_valid_thru_text = document.getElementById("speava_valid_thru");
+
 
     if (speava_all_others) {
       speava_all_others.style.color = font_color;
@@ -2089,6 +2179,9 @@ try {
     if (feedback_textarea){
       feedback_textarea.style.color = font_color;
     }
+    if (speava_valid_thru_text){
+      speava_valid_thru_text.style.color = font_color;
+    }
   }
 
   const applyOptionStyles = () => {
@@ -2099,6 +2192,7 @@ try {
     const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
     const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
     const buttons_for_command = document.getElementById("speava_buttons");
+    const speava_valid_thru_text = document.getElementById("speava_valid_thru");
 
     let parsed_json = null;
     let buttons_style_top = '0px';
@@ -2205,6 +2299,9 @@ try {
       buttons_for_command.style.top = buttons_style_top;
       buttons_for_command.style.right = buttons_style_right;
     }
+    if (speava_valid_thru_text){
+      speava_valid_thru_text.style.zIndex = z_index;
+    }
   }
 
   const setShortcutKeys = (e) => {
@@ -2224,8 +2321,162 @@ try {
         open_option_dialog();
       }
       ;
+      const keycode_to_show_auth = 54;
+      const keycode_to_clear_auth = 53;
+      if (e.keyCode === keycode_to_show_auth & e.ctrlKey === true) {
+        toast_to_notify("authenticate yourself",5000);
+        open_auth_dialog("login");
+      };
+      if (e.keyCode === keycode_to_clear_auth & e.ctrlKey === true) {
+        toast_to_notify("Clear authenticated data",5000);
+        open_auth_dialog("clear");
+      };
+
     }
     }
+
+  // -------------------------------------------------------------------------
+  // login with Google account
+  // -------------------------------------------------------------------------
+  const toggleLogin = () => {
+    // make it tri-state. On / about to expire / off
+    isLoggedIn ? stopLogin() : startLogin()
+  }
+
+  const open_auth_dialog = (message_type) => {
+
+    if (message_type === "clear"){
+      speava_access_token_openid = "";
+      speava_access_token_validuntil = null;
+      isLoggedIn = false;
+    }
+
+    let CLIENT_ID = speava_oauth_client_id;
+    let message_to_authentication = {
+      message_type: message_type,
+      client_id: CLIENT_ID
+    }
+
+    chrome.runtime.sendMessage({ message: message_to_authentication }, (response) =>  {
+        console.log('got the response'); //this log is never written
+        if (response.message === 'success'){
+            console.log(response.access_token);
+            speava_access_token_openid = response.access_token;
+            speava_access_token_validuntil = response.valid_through;
+            if (speava_access_token_openid!=="") {
+              token_expire_interval = setInterval(tryTo(login_expiration_loop, 'attach to captions'), 10000);
+              document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+              isLoggedIn = true;
+            } else {
+              const msg_string_auth = chrome.i18n.getMessage("oauth_stopped_or_failed");
+              toast_to_notify(msg_string_auth,5000);  // "authentication stopped or failed."
+              isLoggedIn = false;
+            }
+        }
+    });
+  }
+
+  const stopLogin = () => {
+    // clearInterval(closedCaptionsAttachInterval)
+    clearInterval(token_expire_interval);
+    const msg_string_auth = chrome.i18n.getMessage("oauth_clearing_auth_data");
+    toast_to_notify(msg_string_auth,5000); // i18n "Clear authenticated data"
+    open_auth_dialog("clear");
+    document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.remove('on');
+  }
+
+  const startLogin = () => {
+    // token_expire_interval = setInterval(tryTo(login_expiration_loop, 'attach to captions'), 1000);
+    open_auth_dialog("clear");
+    const msg_string_auth = chrome.i18n.getMessage("oauth_request_to_authenticate");
+    toast_to_notify(msg_string_auth,5000); // i18n "authenticate yourself"
+    open_auth_dialog("login");
+    // if (speava_access_token_openid!=="") {
+    //   document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+    // } else {
+    //   toast_to_notify("authentication stopped or failed.",5000);
+    // }
+  }
+
+  const login_expiration_loop = () => {
+    let renewal_check_date = new Date();
+    if (speava_access_token_validuntil === null){
+      return;
+    }
+    if  ( new Date(speava_access_token_validuntil) <= new Date() ) {
+      const msg_string_auth = chrome.i18n.getMessage("oauth_notify_expiration");
+      toast_to_notify(msg_string_auth,5000);  // i18n "Authenticated data expired."
+      open_auth_dialog("clear");
+      return;
+    }
+
+    // pre-warn period to prompt to re-authenticate
+    renewal_check_date.setSeconds(renewal_check_date.getSeconds() + 180);
+    if ( new Date(speava_access_token_validuntil) <= renewal_check_date ) {
+      const msg_string_auth = chrome.i18n.getMessage("oauth_notify_soon_to_be_expired");
+      const json_options_auth = {
+        heading: msg_string_auth,  // i18n "Authenticatation is about to expire. Authenticate yourself"
+        prompt_options: "Yes",
+        setting: {duration:2500}
+      }
+      PromptGeneric(json_options_auth);
+    }
+  }
+
+  const PromptGeneric = (json_text) => {
+    return new Promise((resolve, reject) => {
+      let dialog = document.createElement('dialog');
+      let counter = 0;
+      let inner_text = "";
+      let heading = json_text.heading;
+      let prompt_text = json_text.prompt_options;
+      const time_length = json_text.setting.duration;
+      dialog.id = "prompt_generic_dialog"
+      inner_text = `<form>`;
+      inner_text += `<div style="display:inline; font-size:48px;">${heading}<br></div>`
+      item_texts = prompt_text.split(",");
+      for (let item_text of item_texts) {
+        inner_text += `<div id="prompttext${counter}" style="display:inline; font-size:48px;">${item_text} </div>`
+        counter += 1;
+      }
+      inner_text += `         
+              <input type="text" hidden="true">
+              <button type="submit" hidden="true">Ok</button>
+          </form>
+      `;
+      dialog.innerHTML = inner_text;
+      document.body.appendChild(dialog);
+      dialog.oncancel = function(){
+        dialog.remove();
+      }
+      dialog.showModal();
+      if (prompt_text.length === 0) {
+        setTimeout( function() {dialog.remove();}, 1000);
+      } else {
+        setTimeout( function() {dialog.remove();}, time_length);
+        // setTimeout( function() {
+        //   const message_text = chrome.i18n.getMessage("prompt_no_answer");
+        //   if_dialog_exist = document.getElementById('prompt_generic_dialog');
+        //   if (if_dialog_exist){
+        //     toast_to_notify('<div style="font-size:24px;">' +
+        //         message_text +
+        //         '</div>',2500);
+        //   }
+        //   dialog.remove();
+        //   }, time_length);
+      }
+      for (let new_counter = 0; new_counter < counter ;new_counter++) {
+        document.getElementById(`prompttext${new_counter}`).addEventListener('click', e => {
+          if (e.target.innerText === "Yes"){
+            open_auth_dialog("clear");
+            isLoggedIn = false;
+            open_auth_dialog("login");
+          }
+          document.getElementById('prompt_generic_dialog').remove();
+        });
+      }
+    });
+  }
 
 
   ////////////////////////////////////////////////////////////////////////////
@@ -2259,6 +2510,14 @@ try {
                                       width:36px;
                                       height:36px;}  `
   document.head.append(STYLE);
+  const STYLE_LOGIN_ICON = document.createElement('style')
+  STYLE_LOGIN_ICON.innerText = `#__lca-login-icon.on { background-image: url("${url_icon_circle}");
+                                      background-size: 36px;
+                                      opacity: 0.5;
+                                      z-index: 99;
+                                      width:36px;
+                                      height:36px;}  `
+  document.head.append(STYLE_LOGIN_ICON);
 })();
 
 } catch (e) {

@@ -1,12 +1,12 @@
 <!DOCTYPE html>
 <html>
-<head><title>My Test Extension Options</title></head>
+<head><title>Extension Options</title></head>
 <body>
-<div><span>Server URL to record captions:</span>
-<span><input style="width:95%" type="text" id="speava_session_record"><br></span>
+<div><span>Session name to capture<a href="https://akinorioyama.com/live-caption-analytics/help/configure-session-name" target="_blank">(?)</a></span>
+<span><input style="width:95%"  type="text" id="speava_session_id"></span>
 </div>
-<div><span>Server URL to record for Google Spreadsheet:</span>
-<span><input style="width:95%"  type="text" id="speava_session_spreadsheet_post"><br></span>
+<div><span>Server URL to record captions:<a href="https://akinorioyama.com/live-caption-analytics/help/configure-server-url" target="_blank">(?)</a></span>
+<span><input style="width:95%" type="text" id="speava_session_record"><br></span>
 </div>
 <div><span>User name to record in caption record and to receive feedback for.</span>
 <span><input type="text" id="speava_session_username"></span>
@@ -22,10 +22,6 @@
 </div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_send_raw"></span>
     <span><label for="speava_session_send_raw">Send captions to analytics server</label></span>
-</div>
-<div>
-<span><input style="width:5%"  type="checkbox" id="speava_session_post"></span>
-    <span><label for="speava_session_post" >Send captions to Spreadsheet</label><br>(refer to <a href="https://akinorioyama.com/live-caption-analytics/lca-googlespreadsheet-integration/" target="_blank">this document</a> to create a receiving sheet)</span>
 </div>
 <div>
 <span><input style="width:5%"  type="checkbox" id="speava_session_show"></span>
@@ -49,8 +45,15 @@
 <div><span>Element position settings<a href="https://akinorioyama.com/live-caption-analytics/help/element_position_settings" target="_blank">(?)</a><br></span>
 <span><textarea id="speava_session_window_positions" rows="5" cols="40"></textarea></span>
 </div>
-<div><span>Override(force) session name to capture</span>
-<span><input style="width:95%"  type="text" id="speava_session_id"></span>
+<div><span>Override(force) OAuth client<a href="https://akinorioyama.com/live-caption-analytics/help/authentication-through-google" target="_blank">(?)</a></span>
+<span><input style="width:95%"  type="text" id="speava_oauth_client_id"></span>
+</div>
+<div><span>Server URL to record for Google Spreadsheet:</span>
+<span><input style="width:95%"  type="text" id="speava_session_spreadsheet_post"><br></span>
+</div>
+<div>
+<span><input style="width:5%"  type="checkbox" id="speava_session_post"></span>
+    <span><label for="speava_session_post" >Send captions to Spreadsheet</label><br>(refer to <a href="https://akinorioyama.com/live-caption-analytics/lca-googlespreadsheet-integration/" target="_blank">this document</a> to create a receiving sheet)</span>
 </div>
 <div id="status"></div>
 <button id="speava_option_save">Save</button>

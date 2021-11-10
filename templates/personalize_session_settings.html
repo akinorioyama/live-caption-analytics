@@ -15,11 +15,13 @@
     </script>
 </head>
 <body>
+<a href="/">Show start page</a>
+<div><span>email:</span><span>{{email}}</span></div>
 <form action="/personalize_session_settings" method="POST" enctype="multipart/form-data">
 <div>
     <span>
-<b>Session id:</b>
-        <input style="width:30%" type="text" name="session" value="{{session}}" onchange="clear_textareas();"><br>
+<b>Session:</b>
+        <input style="width:30%" type="text" name="session_id" value="{{session_id}}" onchange="clear_textareas();"><br>
     </span>
 </div>
 <div>
@@ -45,8 +47,8 @@
 <div><span><b>Vocaburary set to cover</b><br></span>
 <span><textarea name="vocab_to_cover" rows="3" cols="120">{{vocab_to_cover}}</textarea></span>
 </div>
+    <button id="speava_clear">Reload</button>
     <button id="save" name="command" value="save">Save</button>
-
 	<input type="submit" value="Search">
 </form>
 
@@ -70,4 +72,9 @@
 
 <!--<script src="options.js"></script>-->
 </body>
+    <script type="text/javascript">
+        document.getElementById('speava_clear').addEventListener('click',
+            clear_textareas);
+    </script>
+
 </html>

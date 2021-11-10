@@ -5,8 +5,10 @@
     <title>Extract vocab from a page</title>
 </head>
 <body>
+<a href="/">Show start page</a>
 <form action="/show_list" method="POST" enctype="multipart/form-data">
-	<input type="text" name="url" aria-label="text">
+    <span><label for="speava_session_text_url">URL to retrieve resource</label></span>
+	<input style="width:70%" type="text" name="url" aria-label="text"  id="speava_session_text_url"><br>
 	<input type="submit" value="Send">
 </form>
 </body>

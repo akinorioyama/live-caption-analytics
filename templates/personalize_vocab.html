@@ -5,11 +5,13 @@
     <title>Personalize vocabulary set</title>
 </head>
 <body>
+<a href="/">Show start page</a>
+<div><span>email:</span><span>{{email}}</span></div>
 <form action="/personalize_session" method="POST" enctype="multipart/form-data">
 <div>
     <span>
-<b>Session id:</b>
-        <input style="width:70%" type="text" name="session" value="{{session}}"><br>
+<b>Session:</b>
+        <input style="width:70%" type="text" name="session_id" value="{{session_id}}"><br>
     </span>
 </div>
 <div>

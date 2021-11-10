@@ -1,7 +1,9 @@
 # live-caption-analytics
 This chrome extension sends captions to servers to perform analytics and return feedback to the sender. Thanks to the author of [google-meet-transcripts](https://github.com/dzaman/google-meet-transcripts), the extension is first created to read live caption in **Google Meet**, and evolved to capture subtitles in **Zoom** and **Chrome built-in speech recognition** generated transcript rendered in the proprietary area of the extension by this extension. 
 
-The <b>chrome extension</b> will post the data to two of your servers to analyze or record live transcript. The one endpoint is to perform caption <b>analysis</b> and the other is to send the latest lines of caption to <b>record</b> in a storage, in the sample, a Google spreadsheet. Those two endpoints are independent from each other and can be called separately. This [YouTube video](https://www.youtube.com/watch?v=g1aYP5yyyJQ) will show the screen interaction in the browser. Updated behaviors are included in [YouTube video](https://www.youtube.com/watch?v=TAUHOKM8Tug) (Aug. 30, 2021) and **_YouTube clip for v1.0.3 (~~to be updated soon~~ [1](https://youtu.be/ze80wsKugek), [2](https://youtu.be/PT1dbg1NPA0), and [3](https://youtu.be/Fw1d2o4A3b0)  )_**. V1.0.3.2 introduces tentative code blocks to import texts and use them for vocab coverage ([here](https://www.youtube.com/watch?v=FrjfukiYkhs) ~~clip will be **available soon**~~). V1.0.3.3 has an updated features in prompt backend to inform learners about one's overused words (shown [here](https://www.youtube.com/watch?v=PRg8LIX81Uk)).   
+The <b>chrome extension</b> will post the data to two of your servers to analyze or record live transcript. The one endpoint is to perform caption <b>analysis</b> and the other is to send the latest lines of caption to <b>record</b> in a storage, in the sample, a Google spreadsheet. Those two endpoints are independent from each other and can be called separately. This [YouTube video](https://www.youtube.com/watch?v=g1aYP5yyyJQ) will show the screen interaction in the browser. Updated behaviors are included in [YouTube video](https://www.youtube.com/watch?v=TAUHOKM8Tug) (Aug. 30, 2021) and **_YouTube clip for v1.0.3 (~~to be updated soon~~ [1](https://youtu.be/ze80wsKugek), [2](https://youtu.be/PT1dbg1NPA0), and [3](https://youtu.be/Fw1d2o4A3b0)  )_**. V1.0.3.2 introduces tentative code blocks to import texts and use them for vocab coverage ([here](https://www.youtube.com/watch?v=FrjfukiYkhs) ~~clip will be **available soon**~~). V1.0.3.3 has an updated features in prompt backend to inform learners about one's overused words (shown [here](https://www.youtube.com/watch?v=PRg8LIX81Uk)).
+
+From the version 1.0.4, <b>users must authenticate through Google account</b> to prove their identity. The sample application reads your account information shown in the popup after you explicitly <b>"Sign in with Google"</b> to continue to the server, as the prompt popup shows "To continue, Google will share your name, email address, ... with Live caption analytics." OAuth must be configured for your servers. 
 
 **Building blocks**
 ---
@@ -34,7 +36,7 @@ save_to_storage.py <---5) analysis - sample implementation for retriving stored 
 
 **Documentation**
 ---
-User documentation for the extension will be updated in `doc` folder.
+User documentation for the extension will be updated in `doc` folder of the repo and in the <i>Live caption analytics</i> section of my website ([here](https://akinorioyama.com/live-caption-analytics/)). 
 
 **Features**
 ---
@@ -64,6 +66,10 @@ Aside from the ***chrome extensions*** and key functions in ***analysis*** and *
 
 ***12) personalization*** allows the learners to configure the lists of vocabulary to avoid, rephrase, and cover in `/personalize_session_settings`.
 
+***13) start page*** (`/`) allows users to start pages to change settings for the features above, previously covered only in links written for each function.
+
+***14) list sessions*** shows the recorded sessions for the authenticated user (at `list_session`).
+
 **(In pipeline)**
 
 Candidate 1: ***target vocabulary*** will show the target language for a single session or cross sessions. Checkboxes will be ticked once a word is used in the session. This may use SRS from apps.
@@ -77,6 +83,14 @@ Candidate 1: ***target vocabulary*** will show the target language for a single 
 - English Grammar Profile
 - Universal/Dewey Decimal Classification (available in WordNet Domains)
 - _finally_ CEFR descriptor/competency/can do.  
+
+Candidate 2: ***authentication or user management*** will enable user management in the sample server application. This may include other authentication providers such as Facebook. 
+- [ ] allow other users to access the session recorded by the owner of the session
+
+Candidate 3: ***other voice interactions*** will enable users to capture other sites.
+- [ ] interactions on specific sites (Twitter Spaces)
+- [ ] interactions to capture through option settings
+
 
 **References**
 ---
@@ -96,6 +110,7 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20211110|v1.0.4.0|**Authentication**: authenticate through Google account<br>**Usability**:add <i>Start page</i> to access features and <i>download</i> for caption and vocabulary frequency|
 |20211005|v1.0.3.5|**Major fix**: extension not shown in Google Meet|
 |20211001|v1.0.3.4|**Configuration**: place elements and apply changes immediately<br>**Domains**: add a part of *.net domains|
 |20210928|v1.0.3.3|**Personalization**: change vocabulary to work on<br>**DB filename**: from test.db to main.db<br>minor fixes: refrain from focusing on participant list|

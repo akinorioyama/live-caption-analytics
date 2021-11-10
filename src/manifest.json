@@ -6,14 +6,17 @@
     "js": "options.js"
   },
   "description": "Provide routes to send live captions to analytics servers.",
-  "version": "1.0.3.5",
+  "version": "1.0.4.0",
   "icons": {
     "128": "icons/icon.png"
+  },
+  "background":{
+    "service_worker":"background.js"
   },
   "content_scripts": [{
     "matches": ["https://meet.google.com/*",
                 "https://*.zoom.us/wc/*",
-                "http://localhost/lca/*",
+                "https://localhost/lca/*",
                 "https://*.jp/*",
                 "https://*.com/*",
                 "https://nativecamp.net/*",
@@ -26,12 +29,13 @@
     "all_frames": false
   }],
   "permissions": [
-    "storage"
+    "storage",
+    "identity"
   ],
   "host_permissions": [
     "https://meet.google.com/*",
     "https://*.zoom.us/",
-    "http://localhost/lca/*",
+    "https://localhost/lca/*",
     "https://*.rarejob.com/*",
     "https://eikaiwa.dmm.com/*"
   ],
@@ -39,12 +43,15 @@
     {
       "resources": [
         "options.js",
+        "background.js",
         "options.html",
         "icons/icon_config.png","icons/icon_delete.png","icons/icon_circle.png","icons/icon_record.png","icons/icon_log.png",
+        "icons/icon_login.png",
         "css/style.css"],
       "matches": [ "https://meet.google.com/*",
                    "https://*.zoom.us/*",
                    "http://localhost/*",
+                   "https://localhost/*",
                    "https://*.jp/*",
                    "https://*.com/*",
                    "https://nativecamp.net/*",

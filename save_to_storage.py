@@ -90,8 +90,9 @@ def get_caption_html(session="",start:datetime=None):
 def get_blending_logs(session="",start:datetime=None,df_caption:pd.DataFrame=None):
 
     df_log_combined = log_load(session=session,start=start)
-    if len(df_caption) == 0:
-        return df_caption
+#   df_caption may have no entries, but log has to be blended
+#     if len(df_caption) == 0:
+#         return df_caption
 
     found_word = {}
 
@@ -103,15 +104,14 @@ def get_blending_logs(session="",start:datetime=None,df_caption:pd.DataFrame=Non
 
         if log_located.empty == True:
             temp_text = "<b>Looged item:" + log_line['logtype'] + "</b>"
-            tmp_se = pd.Series([
-                None,
-                session,
-                log_line['start'],
-                log_line['start'],
-                log_line['actor'],
-                temp_text,
-                ''
-            ], index=df_caption.columns)
+            tmp_se = pd.Series({
+                "session": session,
+                "start": log_line['start'],
+                "end": log_line['start'],
+                "actor" :log_line['actor'],
+                "text": temp_text,
+                # "actor_ip":''
+            }, index=df_caption.columns)
             df_caption = df_caption.append(tmp_se, ignore_index=True)
 
         for index, location_item in log_located.iterrows():

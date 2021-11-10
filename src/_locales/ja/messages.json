@@ -58,5 +58,37 @@
         "placeholders": {
           "word": { "content": "$1" }
         }
+    },
+    "oauth_not_authenticated":{
+        "message" : "認証されていません"
+    },
+    "oauth_valid_thru":{
+        "message" : "認証の有効期限 "
+    },
+    "oauth_stopped_or_failed": {
+        "message" : "認証が中断されたか失敗しました"
+    },
+    "oauth_clearing_auth_data": {
+        "message" : "認証情報を削除しました"
+    },
+    "oauth_request_to_authenticate": {
+        "message" : "認証してください"
+    },
+    "oauth_notify_expiration": {
+        "message": "認証の有効期限が切れました"
+    },
+    "oauth_notify_soon_to_be_expired": {
+        "message": "認証の有効期間が間もなく修了します。認証してください"
+    },
+    "oauth_not_verified_on_server": {
+        "message": "認証がサーバーで確認できませんでした。再度認証が必要です。認証してください"
+    },
+    "server_not_reached_with_errors" :
+    {
+        "message" : "拡張機能が交信しようとしたanalytics server から応答がありませんでした。<a href='$server_url$' target='_blank'>analytics server(ここをクリック)</a>を開いて設定しているサーバーが動作しているか確認してください",
+        "placeholders": {
+          "server_url": { "content": "$1" }
+        }
     }
+
 }

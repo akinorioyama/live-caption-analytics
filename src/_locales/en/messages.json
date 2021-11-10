@@ -60,6 +60,36 @@
         "placeholders": {
           "word": { "content": "$1" }
         }
+    },
+    "oauth_not_authenticated":{
+        "message" : "Not authenticated"
+    },
+    "oauth_valid_thru":{
+        "message" : "Authenticated until "
+    },
+    "oauth_stopped_or_failed": {
+        "message" :  "authentication stopped or failed."
+    },
+    "oauth_clearing_auth_data": {
+        "message" :" Clear authenticated data"
+    },
+    "oauth_request_to_authenticate": {
+        "message" : "authenticate yourself"
+    },
+    "oauth_notify_expiration": {
+        "message": "Authenticated data expired."
+    },
+    "oauth_notify_soon_to_be_expired": {
+        "message": "Authenticatation is about to expire. Authenticate yourself"
+    },
+    "oauth_not_verified_on_server": {
+        "message": "Authenticatation is not verified on server. You need to authenticate again. Authenticate yourself?"
+    },
+    "server_not_reached_with_errors" :
+    {
+        "message" : "Error issued when the extension is trying to receive response from your analytics server. Access <a href='$server_url$' target='_blank'>your analytics server (click here)</a> to see if the server is up and running.",
+        "placeholders": {
+          "server_url": { "content": "$1" }
+        }
     }
-
 }

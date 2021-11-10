@@ -239,8 +239,8 @@ def save_to_storage(url,raw_texts,title_text):
 
     return df_insert
 
-@app.route('/show_list',methods=['POST','GET'])
-def receive_log():
+# @app.route('/show_list',methods=['POST','GET'])
+def show_text_from_url():
     data = request.get_data().decode('utf-8')
     url = request.form.get("url")
     df_site_text = read_from_storage(url)
@@ -275,27 +275,27 @@ def receive_log():
     kwargs = {"df_list_c1" : df_list_c1, "df_list_b1" : df_list_b1, "df_list_all": df_list_all,
               "vocab_string": vocab_string, "url":url,
               "title": title_text, "vocab_count":vocab_count}
-    from flask import render_template
+
     text = render_template('get_vocab_list_result.html',**kwargs )
     # text = render_template('get_vocab_list_result.html',df_list_c1 = df_list_c1)
 
     return text
 
-@app.route('/get_vocab', methods=['POST', 'GET'])
-def get_vocabs():
+# @app.route('/get_vocab', methods=['POST', 'GET'])
+# def get_vocabs():
+#
+#     text = render_template('get_vocab_list.html')
+#
+#     return text
 
-    text = render_template('get_vocab_list.html')
-
-    return text
-
-@app.route('/personalize_session_settings', methods=['POST', 'GET'])
-def personalize_for_session_settings():
+# @app.route('/personalize_session_settings', methods=['POST', 'GET'])
+def personalize_for_session_settings(session_string:str="",email_part:str=""):
 
     data = request.get_data().decode('utf-8')
     text_to_avoid = request.form.get("text_to_avoid",None)
     text_to_suggest_alternatives = request.form.get("text_to_suggest_alternatives",None)
     vocab_to_cover = request.form.get("vocab_to_cover",None)
-    session_string = request.form.get("session",None)
+    # session_string_str = request.form.get("session_id",None)
     username = request.form.get("username",None)
 
     kwargs = {}
@@ -335,9 +335,9 @@ def personalize_for_session_settings():
                     kwargs['vocab_to_cover'] = ",".join(df_session_vocab_to_cover['value'])
             else:
                 kwargs['vocab_to_cover'] = vocab_to_cover
-
+    kwargs["email"]= email_part
     button_command_value = request.form.get("command",None)
-    if button_command_value == "save":
+    if button_command_value == "save"  and session_string is not None:
         print("save words to db!!")
         conn = sqlite3.connect(DB_NAME)
         user_to_update_db = username
@@ -377,8 +377,8 @@ def personalize_for_session_settings():
     text = render_template('personalize_session_settings.html', **kwargs)
     return text
 
-@app.route('/personalize_session', methods=['POST', 'GET'])
-def personalize_for_session_vocab():
+# @app.route('/personalize_session', methods=['POST', 'GET'])
+def personalize_for_session_vocab(session_string:str="",email_part:str=""):
 
     data = request.get_data().decode('utf-8')
     text_to_be_parsed = request.form.get('text_to_parse',"")
@@ -388,7 +388,11 @@ def personalize_for_session_vocab():
     df_resource_list = get_resource_list()
     df_resource_list['id_checked'] = ""
     button_command_value = request.form.get("command",None)
-    session_string = request.form.get("session",None)
+    # session_string_str = request.form.get("session_id",None)
+
+    # google_userid, google_part_of_email = get_user_id_from_session()
+    # session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
+    # session_string = session_id
 
     target_cefr_level = request.form.get("CEFR_equal_or_above",None)
     NGSL_equal_or_above = request.form.get("NGSL_equal_or_above",None)
@@ -435,7 +439,7 @@ def personalize_for_session_vocab():
         vocab_string = ""
         kwargs["outside_form"] = vocab_string
         kwargs['text_to_be_parsed'] = text_to_be_parsed
-
+        kwargs["email"] = email_part
         text = render_template('personalize_vocab.html', **kwargs)
         return text
 
@@ -476,9 +480,10 @@ def personalize_for_session_vocab():
     kwargs["df_list_c1"] = df_list
     vocab_string = json.dumps({"vocab": list(df_list['vocab'].values)})
     kwargs["outside_form"] = vocab_string
+    kwargs["email"]= email_part
     text = render_template('personalize_vocab.html',**kwargs)
 
-    if button_command_value == "save":
+    if button_command_value == "save" and session_string is not None:
         print("save words to db!!")
         dbname = DB_NAME
         conn = sqlite3.connect(dbname)

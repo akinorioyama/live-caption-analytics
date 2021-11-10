@@ -19,11 +19,11 @@ def get_value(key_string):
         return None, error_text
     except KeyError as e:
         error_text = f"get value({key_string})"
-        print(error_text)
+        print("KeyError(config)",error_text)
         return None
     except Exception as e:
         error_text = f"get value({key_string})"
-        print(error_text)
+        print("Exception(config)",error_text)
         return None
 
 

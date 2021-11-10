@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:border="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="UTF-8">
+    <title>List sessions</title>
+    <style>
+        table,
+td {
+    border: 1px solid #333;
+}
+    </style>
+</head>
+<body>
+<a href="/">Show start page</a>
+<div><span>email:</span><span>{{email}}</span></div>
+<div>Select range</div>
+<form action="/list_session" method="POST" enctype="multipart/form-data">
+<div>From:<input type="date" name="start_date" value="{{start_date}}"></div>
+<div>To:<input type="date" name="end_date" value="{{end_date}}"></div>
+<input type="submit" value="Search">
+</form>
+
+<table>
+    <tr><td><b>List of sessions</b></td></tr>
+{% if (df_list is none): %}
+    <tr>
+        <td>Search to find sessions</td>
+        <td></td>
+    </tr>
+{% elif (df_list|length == 0): %}
+    <tr>
+        <td>No sessions are found</td>
+        <td></td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>id</td>
+        <td>Session name</td>
+        <td>Show full info</a></td>
+        <td>Show runtime captioning</td>
+        <td>Download caption</td>
+        <td>Download vocab</td>
+        <td>created at</td>
+    </tr>
+
+    {% for index, item in df_list.iterrows(): %}
+    <tr>
+        <td>{{item['session_id']}}</td>
+        <td>{{item['external_session_name']}}</td>
+        <td><a href="/render_in_full?session={{item['session_id']}}">full info</a></td>
+        <td><a href="/caption?session={{item['session_id']}}">runtime captioning</a></td>
+        <td><a href="/download_caption?session={{item['session_id']}}">Download</a></td>
+        <td><a href="/download_vocab_frequency?session={{item['session_id']}}">Download</a></td>
+        <td>{{item['created_on']}}</td>
+    </tr>
+{% endfor %}
+    {% endif %}
+
+</table>
+
+</body>
+</html>
