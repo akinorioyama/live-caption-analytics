@@ -7,7 +7,7 @@ docopt
 requests
 beautifulsoup4
 selenium
-spacy==2.3.5
+spacy
 spacy-wordnet
 google-api-python-client
 google-auth-httplib2

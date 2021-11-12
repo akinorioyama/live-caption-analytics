@@ -66,21 +66,21 @@ from spacy.tokens import Token
 # Load an spacy model (supported models are "es" and "en")
 nlp = spacy.load('en_core_web_lg')
 
+from spacy import Language
+spacy_wordnet_annotator = WordnetAnnotator(nlp.lang)
+@Language.component("wordnet")
+def spacy_wordnet_wrapper(doc):
+    return spacy_wordnet_annotator(doc)
+
 def get_site_text(url):
 
-    user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36'
+    # user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36'
 
-    dcap = {
-        "phantomjs.page.settings.userAgent": user_agent,
-        'marionette': True
-    }
-    # driver = webdriver.PhantomJS(executable_path="D:/software/phantomjs-2.1.1-windows/bin/phantomjs.exe",desired_capabilities=dcap)
-    options = Options()
+    options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     driver = webdriver.Chrome(chrome_options=options)
     driver.get(url)
-    # WebDriverWait(driver,10)
-    time.sleep(10)
+    WebDriverWait(driver,10)
     html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
     driver.close()
     driver.quit()
@@ -169,7 +169,7 @@ def get_domain_list():
         df_domain_list = pd.read_csv('lookup_result.txt')
     else:
         Token.set_extension('context', default=False, force=True)
-        nlp.add_pipe(WordnetAnnotator('en'), after='tagger')
+        nlp.add_pipe("wordnet", after='tagger')
         token = nlp('prices')[0]
         token._.wordnet.wordnet_domains()
         domains = {}

@@ -110,6 +110,7 @@ Below are major changes.
 
 |Date|Version|Changes|
 |---|---|---|
+|20211112|v1.0.4.0-1|**Minor fix**:stabilize retrieve site text|
 |20211110|v1.0.4.0|**Authentication**: authenticate through Google account<br>**Usability**:add <i>Start page</i> to access features and <i>download</i> for caption and vocabulary frequency|
 |20211005|v1.0.3.5|**Major fix**: extension not shown in Google Meet|
 |20211001|v1.0.3.4|**Configuration**: place elements and apply changes immediately<br>**Domains**: add a part of *.net domains|
