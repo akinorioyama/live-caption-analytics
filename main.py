@@ -830,6 +830,7 @@ def record_captions(df:pd.DataFrame=None,df_existing:pd.DataFrame=None,df_existi
             # if row or exist are not in sufficient length, use what?
             if len(n_gram_row) == 0 or len(n_gram_exist) == 0:
                 print("shorter than length = 3")
+                continue # TODO: fewer words or contiuous string
             # TODO: handle fewer words
             #   critically essential to handle for zoom due to the smaller size of letters sent to server.
             if n_gram_row[0] in n_gram_exist:

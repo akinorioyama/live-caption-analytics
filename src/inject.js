@@ -126,6 +126,112 @@ try {
   let recognition;
   let finalTranscript = '';
 
+  let speava_select_language;
+  // adjusted code part from https://www.google.com/intl/ja/chrome/demos/speech.html
+  // If you modify this array, also update default language / dialect below.
+  const langs =
+      [['Afrikaans', ['af-ZA']],
+        ['አማርኛ', ['am-ET']],
+        ['Azərbaycanca', ['az-AZ']],
+        ['বাংলা', ['bn-BD', 'বাংলাদেশ'],
+          ['bn-IN', 'ভারত']],
+        ['Bahasa Indonesia', ['id-ID']],
+        ['Bahasa Melayu', ['ms-MY']],
+        ['Català', ['ca-ES']],
+        ['Čeština', ['cs-CZ']],
+        ['Dansk', ['da-DK']],
+        ['Deutsch', ['de-DE']],
+        ['English', ['en-AU', 'Australia'],
+          ['en-CA', 'Canada'],
+          ['en-IN', 'India'],
+          ['en-KE', 'Kenya'],
+          ['en-TZ', 'Tanzania'],
+          ['en-GH', 'Ghana'],
+          ['en-NZ', 'New Zealand'],
+          ['en-NG', 'Nigeria'],
+          ['en-ZA', 'South Africa'],
+          ['en-PH', 'Philippines'],
+          ['en-GB', 'United Kingdom'],
+          ['en-US', 'United States']],
+        ['Español', ['es-AR', 'Argentina'],
+          ['es-BO', 'Bolivia'],
+          ['es-CL', 'Chile'],
+          ['es-CO', 'Colombia'],
+          ['es-CR', 'Costa Rica'],
+          ['es-EC', 'Ecuador'],
+          ['es-SV', 'El Salvador'],
+          ['es-ES', 'España'],
+          ['es-US', 'Estados Unidos'],
+          ['es-GT', 'Guatemala'],
+          ['es-HN', 'Honduras'],
+          ['es-MX', 'México'],
+          ['es-NI', 'Nicaragua'],
+          ['es-PA', 'Panamá'],
+          ['es-PY', 'Paraguay'],
+          ['es-PE', 'Perú'],
+          ['es-PR', 'Puerto Rico'],
+          ['es-DO', 'República Dominicana'],
+          ['es-UY', 'Uruguay'],
+          ['es-VE', 'Venezuela']],
+        ['Euskara', ['eu-ES']],
+        ['Filipino', ['fil-PH']],
+        ['Français', ['fr-FR']],
+        ['Basa Jawa', ['jv-ID']],
+        ['Galego', ['gl-ES']],
+        ['ગુજરાતી', ['gu-IN']],
+        ['Hrvatski', ['hr-HR']],
+        ['IsiZulu', ['zu-ZA']],
+        ['Íslenska', ['is-IS']],
+        ['Italiano', ['it-IT', 'Italia'],
+          ['it-CH', 'Svizzera']],
+        ['ಕನ್ನಡ', ['kn-IN']],
+        ['ភាសាខ្មែរ', ['km-KH']],
+        ['Latviešu', ['lv-LV']],
+        ['Lietuvių', ['lt-LT']],
+        ['മലയാളം', ['ml-IN']],
+        ['मराठी', ['mr-IN']],
+        ['Magyar', ['hu-HU']],
+        ['ລາວ', ['lo-LA']],
+        ['Nederlands', ['nl-NL']],
+        ['नेपाली भाषा', ['ne-NP']],
+        ['Norsk bokmål', ['nb-NO']],
+        ['Polski', ['pl-PL']],
+        ['Português', ['pt-BR', 'Brasil'],
+          ['pt-PT', 'Portugal']],
+        ['Română', ['ro-RO']],
+        ['සිංහල', ['si-LK']],
+        ['Slovenščina', ['sl-SI']],
+        ['Basa Sunda', ['su-ID']],
+        ['Slovenčina', ['sk-SK']],
+        ['Suomi', ['fi-FI']],
+        ['Svenska', ['sv-SE']],
+        ['Kiswahili', ['sw-TZ', 'Tanzania'],
+          ['sw-KE', 'Kenya']],
+        ['ქართული', ['ka-GE']],
+        ['Հայերեն', ['hy-AM']],
+        ['தமிழ்', ['ta-IN', 'இந்தியா'],
+          ['ta-SG', 'சிங்கப்பூர்'],
+          ['ta-LK', 'இலங்கை'],
+          ['ta-MY', 'மலேசியா']],
+        ['తెలుగు', ['te-IN']],
+        ['Tiếng Việt', ['vi-VN']],
+        ['Türkçe', ['tr-TR']],
+        ['اُردُو', ['ur-PK', 'پاکستان'],
+          ['ur-IN', 'بھارت']],
+        ['Ελληνικά', ['el-GR']],
+        ['български', ['bg-BG']],
+        ['Pусский', ['ru-RU']],
+        ['Српски', ['sr-RS']],
+        ['Українська', ['uk-UA']],
+        ['한국어', ['ko-KR']],
+        ['中文', ['cmn-Hans-CN', '普通话 (中国大陆)'],
+          ['cmn-Hans-HK', '普通话 (香港)'],
+          ['cmn-Hant-TW', '中文 (台灣)'],
+          ['yue-Hant-HK', '粵語 (香港)']],
+        ['日本語', ['ja-JP']],
+        ['हिन्दी', ['hi-IN']],
+        ['ภาษาไทย', ['th-TH']]];
+
   if (hostname_for_adhoc.match("meet.google") !== null){
     } else if (hostname_for_adhoc.match("zoom") !== null) {
     } else {
@@ -321,7 +427,8 @@ try {
       speava_session_window_positions: null,
       speava_session_text_color: "",
       speava_session_id: "SessionName",
-      speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
+      speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com",
+      speava_select_language: "en-US"
     }, (items) => {
         // resolve(is_synced = true);
         is_synced = true
@@ -345,6 +452,7 @@ try {
         speava_session_text_color =           items.speava_session_text_color;
         speava_session_id =                   items.speava_session_id;
         speava_oauth_client_id =              items.speava_oauth_client_id;
+        speava_select_language =              items.speava_select_language;
         currentTranscriptId = speava_session_id;
         let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
         SPEAKER_NAME_MAP = obj;
@@ -503,6 +611,24 @@ try {
 
     // set this to null to force it to increment
     currentSessionIndex = null;
+    // explicit acknowledgement
+    const hostname = document.location.hostname;
+    if (hostname.match("meet.google") !== null){
+    } else if (hostname.match("zoom") !== null){
+    } else {
+      const grant_text = chrome.i18n.getMessage("google_speech_to_text_prompt");
+      const approved_text = chrome.i18n.getMessage("google_speech_to_text_approved");
+      const rejected_text = chrome.i18n.getMessage("google_speech_to_text_rejected");
+      let result = false;
+      result = window.confirm(grant_text);
+      if (result !== true){
+        toast_to_notify(rejected_text, 3000);
+        return;
+      } else {
+        toast_to_notify(approved_text, 3000);
+      }
+    }
+
 
     closedCaptionsAttachInterval = setInterval(tryTo(closedCaptionsAttachLoop, 'attach to captions'), 1000);
     setCurrentTranscriptDetails();
@@ -989,9 +1115,9 @@ try {
       if (candidate) {
         const windowWidth = window.innerWidth;
 
-        const rect = candidate.children[0].getBoundingClientRect();
+        const rect = candidate.children[0].children[0].children[0].getBoundingClientRect();
         const isCentered = Math.abs(rect.x - rect.left) < 10;
-        const isThreeFifthsWidth = Math.abs((rect.x + rect.left)*3/2 - rect.width) < 10;
+        const isThreeFifthsWidth = ((3/5)-0.1< ((rect.width) / windowWidth)) && (((rect.width) / windowWidth)< (3/5)+0.1);
 
         const isLeftAligned = rect.left < (windowWidth * .2);
         const isNotRightAligned = rect.right < (windowWidth * .9);
@@ -1000,9 +1126,19 @@ try {
         // NOTE: could be more precise about location
         // NOTE: could explore factors that lead one of these situations to be
         //       true and then only accept candidates matching the expected case
+        let caption_container_style = null;
+        try {
+          parsed_json = JSON.parse(speava_session_option_string);
+          if ('caption_container_style' in parsed_json){
+            caption_container_style = parsed_json["caption_container_style"];
+          }
+        } catch (e) {
+//
+        }
 
         if (isCentered && isThreeFifthsWidth ||
-            isLeftAligned && isNotRightAligned && isWiderThanHalf) {
+            isLeftAligned && isNotRightAligned && isWiderThanHalf ||
+            candidate.classList.contains(caption_container_style)) {
           const person = xpath('.//div/text()', candidate);
           if (person){
             if (person.textContent==="Meeting host"){
@@ -1427,7 +1563,19 @@ try {
           dialog.oncancel = function(){
             dialog.remove();
           }
+          const update_select_language = () => {
 
+            const speava_select_language = document.getElementById('select_language');
+            for (var i = 0; i < langs.length; i++) {
+              speava_select_language.options[i] = new Option(langs[i][0], i);
+            }
+            // Set default language / dialect.
+            // select_language.selectedIndex = 10;
+            updateCountry();
+            // select_dialect.selectedIndex = 11;
+            //showInfo('info_start');
+          }
+          // dialog.onload = update_select_language();
           // Saves options to chrome.storage
           const save_options = () => {
             var speava_session_record = document.getElementById('speava_session_record').value;
@@ -1445,6 +1593,11 @@ try {
             speava_session_id = document.getElementById('speava_session_id').value;
             speava_session_text_color = document.getElementById('speava_session_text_color').value;
             speava_oauth_client_id = document.getElementById('speava_oauth_client_id').value;
+            var speava_oauth_client_id = document.getElementById('speava_oauth_client_id').value;
+            var element_speava_select_language = document.getElementById('select_language');
+            var element_speava_select_dialect = document.getElementById('select_dialect');
+            var speava_select_language_value = langs[element_speava_select_language.options.selectedIndex];
+            speava_select_language = element_speava_select_dialect.value;
             currentTranscriptId = speava_session_id;
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
@@ -1452,6 +1605,12 @@ try {
             let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
             SPEAKER_NAME_MAP = obj;
             applyFontColor(speava_session_text_color);
+            if (recognition) {
+              if (isTranscribing === true) {
+                recognition.stop();
+                // this will trigger onend and will start recognizing utterances in a newly set language
+              }
+            }
             applyOptionStyles();
             chrome.storage.sync.set({
               speava_session_record: speava_session_record,
@@ -1468,7 +1627,8 @@ try {
               speava_session_window_positions: speava_session_window_positions,
               speava_session_id: speava_session_id,
               speava_session_text_color: speava_session_text_color,
-              speava_oauth_client_id: speava_oauth_client_id
+              speava_oauth_client_id: speava_oauth_client_id,
+              speava_select_language: speava_select_language
             }, function() {
               // Update status to let user know options were saved.
               let optional_buttons = document.getElementById('optional_buttons');
@@ -1484,7 +1644,58 @@ try {
               }, 750);
             });
           }
+          const updateCountry = () => {
+            const speava_select_language = document.getElementById('select_language');
+            const speava_select_dialect = document.getElementById('select_dialect');
+            for (var i = speava_select_dialect.options.length - 1; i >= 0; i--) {
+              speava_select_dialect.remove(i);
+            }
+            var list = langs[speava_select_language.selectedIndex];
+            for (var i = 1; i < list.length; i++) {
+              speava_select_dialect.options.add(new Option(list[i][1], list[i][0]));
+            }
+            speava_select_dialect.style.visibility = list[1].length == 1 ? 'hidden' : 'visible';
+          }
+          const list_of_codes = (language_code) => {
+            let list_code = [];
+            let list_counter = -1;
+            let found_at = 0;
+            langs.forEach(item => {
+              if (item[1].length === 1){
+                // console.log(item[1][0])
+                list_counter++;
+                if (item[1][0] === language_code){
+                  found_at = list_counter;
+                  // return list_counter;
+                }
 
+              } else {
+                list_counter++;
+                item.forEach(subitem => {
+                  if (subitem.length===2){
+                    // console.log(subitem[0])
+                    // list_code.push([subitem[0],list_counter]);
+                    if (subitem[0] === language_code){
+                      found_at = list_counter;
+                      // return list_counter;
+                    }
+                  }
+                } )
+              }
+            });
+            return found_at;
+          }
+          const updateWarnSecurity = (e) => {
+            const grant_text = chrome.i18n.getMessage("confirm_destination_security");
+            const rejected_text = chrome.i18n.getMessage("confirm_destination_rejected");
+
+            let result = false;
+            result = window.confirm(grant_text);
+            if (result!==true){
+              window.alert(rejected_text);
+              dialog.remove();
+            }
+          }
           const restore_options = () => {
             chrome.storage.sync.get({
               speava_session_record: 'enter URL',
@@ -1501,7 +1712,8 @@ try {
               speava_session_window_positions: "",
               speava_session_id: "SessionName",
               speava_session_text_color: "",
-              speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com"
+              speava_oauth_client_id: "987959282782-fsc8ioe25jlesviui02mm8hfa0qiga58.apps.googleusercontent.com",
+              speava_select_language: "en-US"
             }, function(items) {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
@@ -1518,14 +1730,21 @@ try {
               document.getElementById('speava_session_id').value = items.speava_session_id;
               document.getElementById('speava_session_text_color').value = items.speava_session_text_color;
               document.getElementById('speava_oauth_client_id').value = items.speava_oauth_client_id;
+              const item_number = list_of_codes( items.speava_select_language);
+              document.getElementById('select_language').value = item_number;
+              updateCountry();
+              // dialect has to be set after script populats country values
+              document.getElementById('select_dialect').value = items.speava_select_language;
             });
           }
           document.body.appendChild(dialog);
           dialog.showModal();
+          update_select_language();
           restore_options();
           document.getElementById('speava_option_save').addEventListener('click',
             save_options);
-
+          document.getElementById('select_language').addEventListener('change', updateCountry);
+          document.getElementById('speava_session_record').addEventListener('change', updateWarnSecurity);
             });
           });
     }
@@ -1805,6 +2024,7 @@ try {
             recognition.stop();
             toggle_button.classList.remove('speava_button_active')
           } else {
+            recognition.lang = speava_select_language;
             recognition.start();
             toggle_button.classList.add('speava_button_active')
           }
@@ -1820,19 +2040,39 @@ try {
         elem_others.appendChild(elem_interim);
         SpeechRecognition = webkitSpeechRecognition || SpeechRecognition;
         recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
+        recognition.lang = speava_select_language;
         recognition.interimResults = true;
         recognition.continuous = true;
         recognition.onresult = (event) => {
           const fixed_part_of_utterance = document.getElementById('fixed_part_of_utterance');
           const interim_part_of_utterance = document.getElementById('interim_part_of_utterance');
           let interimTranscript = '';
+          let alternating_sub_zero = 0;
           const node = document.getElementById('fixed_part_of_utterance');
           let index = fixed_part_of_utterance.speava_index;
           if (index === undefined){
             index = -1;
             fixed_part_of_utterance.speava_index = -1;
             fixed_part_of_utterance.latest_trascript_part = "";
+            // ".stop" causes "Uncaught TypeError: Cannot read properties of undefined (reading 'count')
+            //                 at SpeechRecognition.recognition.onresult (inject.js:2042)"
+            const currentSpeakerIndex = increment(makeTranscriptKey(currentTranscriptId, currentSessionIndex));
+            CACHE.unshift({
+              ...{
+                image: "",
+                person: speava_server_username,
+                text: ""},
+              startedAt: new Date(),
+              endedAt: new Date(),
+              node,
+              count: 0,
+              pollCount: 0,
+              transcriptId: currentTranscriptId,
+              sessionIndex: currentSessionIndex,
+              speakerIndex: currentSpeakerIndex,
+            });
+            setSpeaker(CACHE[0]);
+            fixed_part_of_utterance.speava_index += 1;
           }
           for (let i = event.resultIndex; i < event.results.length; i++) {
             let transcript = event.results[i][0].transcript;
@@ -1849,7 +2089,23 @@ try {
               fixed_part_of_utterance.latest_trascript_part = "";
             } else {
               interimTranscript = transcript;
-
+              // split when the length exceeds 100
+              if (transcript.length >= 100){
+                finalTranscript += "<br>" + transcript;
+                finalTranscript = finalTranscript.split("<br>").slice(finalTranscript.split("<br>").length - 2,finalTranscript.split("<br>").length).join("<br>")
+                // finalTranscript = finalTranscript.split("<br>").slice(0,2).join("<br>")
+                const cache = CACHE[index];
+                cache.count += 1;
+                cache.endedAt = new Date();
+                cache.text = transcript;
+                setSpeaker(cache);
+                fixed_part_of_utterance.speava_index = -1;
+                fixed_part_of_utterance.latest_trascript_part = "";
+                fixed_part_of_utterance.innerHTML = '<style="color:'
+                    + speava_session_text_color+ ';">' + finalTranscript + '</>';
+                interim_part_of_utterance.innerHTML =  '';
+                recognition.stop()
+              }
               if (index===-1) {
                 const currentSpeakerIndex = increment(makeTranscriptKey(currentTranscriptId, currentSessionIndex));
                 CACHE.unshift({
@@ -1869,6 +2125,7 @@ try {
                 setSpeaker(CACHE[0]);
                 fixed_part_of_utterance.speava_index += 1;
               } else {
+                let setSpeaker_done = false;
                 if ((fixed_part_of_utterance.latest_trascript_part ==="") || (transcript.split(" ").length >= 5)) {
                   if ((transcript.split(" ").length >= 5 ) &&
                       (transcript.split(" ").length >= fixed_part_of_utterance.latest_trascript_part.split(" ").length)){
@@ -1878,18 +2135,39 @@ try {
                     cache.endedAt = new Date();
                     cache.text = transcript ;
                     setSpeaker(cache);
+                    setSpeaker_done = true;
+                  }
+                }
+                if (setSpeaker_done===false&&(transcript.split(" ").length === 1)&&(transcript.length >=10)){
+                  // send once in 0.5 sec for continuous text (for languages such as Japanese)
+                  let current_time = new Date();
+                  let current_sub_zero = current_time.getMilliseconds() + 1;
+                  current_sub_zero = Math.floor(current_sub_zero / 100 );
+                  if ((current_sub_zero === 0 )||(current_sub_zero === 5)) {
+                    if (alternating_sub_zero !== current_sub_zero){
+                      alternating_sub_zero = current_sub_zero;
+                        fixed_part_of_utterance.latest_trascript_part = transcript ;
+                        const cache = CACHE[index];
+                        cache.count += 1;
+                        cache.endedAt = new Date();
+                        cache.text = transcript ;
+                        setSpeaker(cache);
+                    }
                   }
                 }
               }
 
             }
           }
-          fixed_part_of_utterance.innerHTML = finalTranscript;
-          interim_part_of_utterance.innerHTML =  '<i style="color:#ddd;">' + interimTranscript + '</i>';
+          fixed_part_of_utterance.innerHTML = '<style="color:'
+              + speava_session_text_color+ ';">' + finalTranscript + '</>';
+          interim_part_of_utterance.innerHTML =  '<i style="color:'
+              + speava_session_text_color+ ';">' + interimTranscript + '</i>';
         }
         recognition.onend = function() {
           console.log("voice recognition terminated");
           if (isTranscribing === true){
+            recognition.lang = speava_select_language;
             recognition.start();
             toggle_button.classList.add('speava_button_active');
           } else {
@@ -2199,6 +2477,7 @@ try {
     let buttons_style_right = '100px';
     let elem_others_style_top = '0px';
     let elem_others_style_right = null;
+    let elem_others_style_width = null;
     let z_index = 65000;
     let notification_area_top = "0px";
     let notification_area_right = null;
@@ -2222,6 +2501,9 @@ try {
       }
        if ('elem_others.style.top' in parsed_json){
         elem_others_style_top = parsed_json["elem_others.style.top"];
+      }
+      if ('elem_others.style.width' in parsed_json){
+        elem_others_style_width = parsed_json["elem_others.style.width"];
       }
       if ('notification_area_top' in parsed_json){
         notification_area_top = parsed_json["notification_area_top"];
@@ -2269,6 +2551,9 @@ try {
       speava_all_others.style.top = elem_others_style_top;
       if (elem_others_style_right) {
         speava_all_others.style.right = elem_others_style_right;
+      }
+      if (elem_others_style_width) {
+        speava_all_others.style.width = elem_others_style_width;
       }
     }
     if (fixed_part_of_utterance){

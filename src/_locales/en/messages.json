@@ -91,5 +91,20 @@
         "placeholders": {
           "server_url": { "content": "$1" }
         }
+    },
+    "google_speech_to_text_prompt": {
+        "message": "Browser built-in caption will use Google's speech to text. Please press OK to accept privacy policy of Web Speech API explained at URL:https://www.google.com/chrome/privacy/whitepaper.html#speech under the section named Speech to text."
+    },
+    "google_speech_to_text_approved": {
+        "message": "You have accepted privacy statement of Google speech to text. Live caption has started."
+    },
+    "google_speech_to_text_rejected": {
+        "message": "You have rejected privacy statement of Google speech to text. Live caption is not initiated."
+    },
+    "confirm_destination_security":{
+        "message": "Read the document about security risk in the link marked as ? above the URL input field. Choose OK to accept the choice and to consent to the conditions highlighted in the document."
+    },
+    "confirm_destination_rejected": {
+        "message": "You rejected the new URL value. The option screen will close without saving new values."
     }
 }

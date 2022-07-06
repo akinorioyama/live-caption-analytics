@@ -89,6 +89,21 @@
         "placeholders": {
           "server_url": { "content": "$1" }
         }
+    },
+    "google_speech_to_text_prompt": {
+        "message": "ブラウザの音声認識はGoogle のspeech to text を利用します。https://www.google.com/chrome/privacy/whitepaper.html#speech のSpeech to text のプライバシーの取り扱いに同意の上、OKを選択してください。"
+    },
+    "google_speech_to_text_approved": {
+        "message": "プライバシーの取り扱いに同意されましたので、ブラウザの音声認識を開始します"
+    },
+    "google_speech_to_text_rejected": {
+        "message": "プライバシーの取り扱いに同意されませんでしたので、ブラウザの音声認識は利用できません"
+    },
+    "confirm_destination_security":{
+        "message": "安全上の危険に関する文書を読んで、ご理解の上、同意される場合のみOKを選択してください。文書は、URL の入力項目の上部にある(?)の印で表示されているリンクを押して表示してください。"
+    },
+    "confirm_destination_rejected": {
+        "message": "新しいURL の値を拒否しました。設定画面を保存せずに閉じます。"
     }
 
 }
