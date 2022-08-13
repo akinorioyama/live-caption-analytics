@@ -15,9 +15,22 @@ td {
 <div><span>email:</span><span>{{email}}</span></div>
 <div>Select range</div>
 <form action="/list_session" method="POST" enctype="multipart/form-data">
-<div>From:<input type="date" name="start_date" value="{{start_date}}"></div>
-<div>To:<input type="date" name="end_date" value="{{end_date}}"></div>
-<input type="submit" value="Search">
+<table>
+    <tr>
+        <td><span><label for="session_name">Session name (search/create):</label></span></td>
+        <td><span><input type="input" id="session_name" name="session_name" value="{{session_name}}"></span></td>
+    </tr>
+    <tr>
+        <td><span><label for="start_date">From:</label></span></td>
+        <td><span><input type="date" id="start_date" name="start_date" value="{{start_date}}"></span></td>
+    </tr>
+    <tr>
+        <td><span><label for="end_date">To:</label></span></td>
+        <td><input type="date" id="end_date" name="end_date" value="{{end_date}}"></td>
+    </tr>
+</table>
+<div><input type="submit" name="search" value="Search"></div>
+<div><input type="submit" name="create" value="Create a session under the name"></div>
 </form>
 
 <table>
@@ -37,6 +50,7 @@ td {
         <td>id</td>
         <td>Session name</td>
         <td>Show full info</a></td>
+        <td>Add/remove authorized users</a></td>
         <td>Show runtime captioning</td>
         <td>Download caption</td>
         <td>Download vocab</td>
@@ -48,6 +62,7 @@ td {
         <td>{{item['session_id']}}</td>
         <td>{{item['external_session_name']}}</td>
         <td><a href="/render_in_full?session={{item['session_id']}}">full info</a></td>
+        <td><a href="/personalize_session_authorization?session={{item['session_id']}}">Change</a></td>
         <td><a href="/caption?session={{item['session_id']}}">runtime captioning</a></td>
         <td><a href="/download_caption?session={{item['session_id']}}">Download</a></td>
         <td><a href="/download_vocab_frequency?session={{item['session_id']}}">Download</a></td>

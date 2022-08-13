@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Personalize authorized users</title>
+    <script type="text/javascript">
+        function clear_textareas(){
+            textareas = document.getElementsByTagName("textarea");
+            for (let element of textareas){
+                element.innerText = "";
+            }
+            session_id_field = document.getElementById("session_id");
+            session_id_field.value = "";
+            window.alert("Your entries in fields below are cleared. Update fields and press button.");
+        }
+
+    </script>
+</head>
+<body>
+<a href="/">Show start page</a>
+<div><span>email:</span><span>{{email}}</span></div>
+<form action="/personalize_session_authorization" method="POST" enctype="multipart/form-data">
+<div>
+    <span>
+<b>Session:</b>
+        <input style="width:30%" type="text" id="session_id" name="session_id" value="{{session_id}}" readonly="readonly" onchange="clear_textareas();"><br>
+    </span>
+</div>
+<div>
+    <span>
+<b>Internal session id:</b>
+        <input style="width:30%" type="text" name="internal_session_id" value="{{internal_session_id}}" onchange="clear_textareas();"><br>
+    </span>
+</div>
+
+    <div>
+    <span>
+<b>username:</b>
+        <input style="width:30%" type="text" name="username" value="{{username}}" onchange="clear_textareas();"><br>
+        Use "all" for settings for all the users or your name for settings only for the user. If this item is left blank, the system uses "all" by default.
+
+        <br>
+    </span>
+</div>
+<div><span><b>Token to invite other users</b><br>
+    Press "generate" button to issue token string and its associated invitation link<br>
+    You can send this link to join your session where the user will receive feedback if they accept<br></span>
+
+<div>
+    <table>
+    <tr><td><b>List of tokens for this session</b></td></tr>
+{% if (df_list_token is none): %}
+    <tr>
+        <td>No token is retrieved</td>
+        <td></td>
+    </tr>
+{% elif (df_list_token|length == 0): %}
+    <tr>
+        <td>No token are found</td>
+        <td></td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>id</td>
+        <td>token</td>
+        <td>URL</a></td>
+    </tr>
+
+    {% for index, item in df_list_token.iterrows(): %}
+    <tr>
+        <td>{{item['id']}}</td>
+        <td>{{request.host_url}}/grant_access_via_token?token={{item['token']}}</td>
+        <td><button id="remove_token" name="remove_token_command" value="session={{internal_session_id}}&id={{item['id']}}">remove</button></td>
+<!--        <td><a href="/personalize_session_token_remove?session={{internal_session_id}}&token={{item['token']}}">Remove</a></td>-->
+    </tr>
+{% endfor %}
+    {% endif %}
+
+</table>
+</div>
+
+<button id="speava_generate_token" name="command" value="speava_generate_token">Generate</button>
+</div>
+<!--
+<div><span><b>authorized users given name</b><br>
+    Users who can access session.<br></span>
+<span><textarea name="text_authorized_names" rows="3" cols="120" readonly="readonly">{{text_authorized_names}}</textarea></span>
+</div>
+-->
+<div><span><b>Add email address to give access</b><br>
+    Users who can access session.<br></span>
+<span><textarea name="text_authorized_email_addresses" rows="3" cols="120">{{text_authorized_email_addresses}}</textarea></span>
+        <button id="save" name="command" value="save">Add email address to allow access to the session</button>
+</div>
+<div>
+    <table>
+    <tr><td><b>List of allowed users (may have not been accepted)</b></td></tr>
+{% if (df_list is none): %}
+    <tr>
+        <td>No authorizaton is retrieved</td>
+        <td></td>
+    </tr>
+{% elif (df_list|length == 0): %}
+    <tr>
+        <td>No authorization are found</td>
+        <td></td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>id</td>
+        <td>owner id</td>
+        <td>email</td>
+        <td>remove</a></td>
+    </tr>
+
+    {% for index, item in df_list.iterrows(): %}
+    <tr>
+        <td>{{item['id']}}</td>
+        <td>{{item['owner']}}</td>
+        <td>{{item['email']}}</td>
+        <td><button id="remove_email" name="remove_email_command" value="session={{internal_session_id}}&id={{item['id']}}">remove</button></td>
+<!--        <td><a href="/personalize_session_authorization_remove?session={{internal_session_id}}&id={{item['id']}}">Remove</a></td>-->
+    </tr>
+{% endfor %}
+    {% endif %}
+
+</table>
+
+</div>
+
+
+
+    <button id="speava_clear">Reload</button>
+	<input type="submit" value="Search">
+</form>
+
+
+    <style>
+        div.textarea {
+   height: 48px;
+   width: 100%;
+}
+        textarea {
+   position: relative;
+   height: 48px;
+   width: 100%;
+   transition: all 500ms;
+}
+        textarea:focus {
+   z-index: 1001;
+   min-height:250px;
+}
+    </style>
+
+<!--<script src="options.js"></script>-->
+</body>
+    <script type="text/javascript">
+        document.getElementById('speava_clear').addEventListener('click',
+            clear_textareas);
+    </script>
+
+</html>

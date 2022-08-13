@@ -33,7 +33,7 @@
     #speava_textarea {
         /*color : #FFFFFF;*/
         position : absolute;
-        width: 300px;
+        /*width: 300px;*/
         z-index: 101;
     }
     #speava_textarea.display_none{

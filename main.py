@@ -46,7 +46,15 @@ from save_to_storage import get_delta
 from save_to_storage import get_blending_logs
 from strip_words import personalize_for_session_vocab
 from strip_words import personalize_for_session_settings
+from strip_words import personalize_for_session_authorization
+from strip_words import grant_token_for_session
+from strip_words import personalize_session_accept_authorization
+from strip_words import personalize_calling_function
 from strip_words import show_text_from_url
+from session_model import list_session
+from session_model import mask_email_address
+from session_model import allowed_function_list
+from session_model import build_calling_function
 from json import JSONDecodeError
 import config_settings
 from  google.oauth2.credentials import Credentials
@@ -59,6 +67,7 @@ DB_NAME = "main.db"
 DB_NAME_SITE = "site.db"
 DB_NAME_LOG = "log.db"
 DB_NAME_AUTH = "session_auth.db"
+REL_SESSION_GRANTED_ID = "grant_authorized"
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
@@ -79,15 +88,6 @@ SCOPES = ['https://www.googleapis.com/auth/userinfo.email','openid','https://www
 API_SERVICE_NAME = 'oauth2'
 API_VERSION = 'v2'
 
-allowed_function_list = ['get_default_sample_1',
-                         'get_vacab_acknowledge_use',
-                         'get_vacab_sugestion',
-                         'get_vocab_coverage',
-                         'get_turn_taking',
-                         'get_vocab_frequency',
-                         'get_word_per_second',
-                         'get_issued_prompts',
-                         'get_all_frozen_captions']
 loaded_vocab_ngsl = pd.read_csv("NGSL+1.txt", delimiter="\t")
 dict_ngsl_level = {row['Lemma']: index for index, row in loaded_vocab_ngsl.iterrows()}
 
@@ -1111,17 +1111,17 @@ def return_notification():
         data_return = jsonify(data_show)
         return data_return
 
-    if option_settings != "":
+    if 'calling_functions' in option_settings:
         option_json = json.loads(option_settings)
-
-        data = dynamic_function_call(option_json=option_json,session_string=session_id,
-                                     section="/notification",username=username,
-                                     google_userid = userinfo_id,google_part_of_email = useremail)
-
-        if data is not None:
-            return data
     else:
         option_json = {}
+
+    data = dynamic_function_call(option_json=option_json,session_string=session_id,
+                                 section="/notification",username=username,
+                                 google_userid = userinfo_id,google_part_of_email = useremail)
+
+    if data is not None:
+        return data
 
     if (datetime.datetime.now().second % 20) <= 1:
 
@@ -1175,7 +1175,8 @@ def return_notification():
 
             data = get_all_frozen_captions(session_string=session_id,
                                            google_userid = userinfo_id,google_part_of_email = useremail)
-
+    if data is None or data == "":
+        print("no data to return")
     return data
 
 @app.route('/show',methods=['POST','GET'])
@@ -1222,17 +1223,17 @@ def return_stat_result():
         data_return = jsonify(data_show)
         return data_return
 
-    if option_settings != "":
+    if 'calling_functions' in option_settings:
         option_json = json.loads(option_settings)
-
-        data_return = dynamic_function_call(option_json=option_json, session_string=session_id,
-                                            section="/show",username=username,
-                                            google_userid = userinfo_id,google_part_of_email = useremail)
-
-        if data_return is not None:
-            return data_return
     else:
         option_json = {}
+
+    data_return = dynamic_function_call(option_json=option_json, session_string=session_id,
+                                        section="/show",username=username,
+                                        google_userid = userinfo_id,google_part_of_email = useremail)
+
+    if data_return is not None:
+        return data_return
 
     if (datetime.datetime.now().second % 15) <= 3:
 
@@ -1278,7 +1279,7 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",
     #     "/show": {"frequecy": 10, "function_list": [{"from": 0, "to": 2, "function_name": "get_default_sample_1n"},
     #                                                  {"from": 3, "to": 5, "function_name": "get_vocab_coverage"},
     #                                                  {"from": 6, "to": 9, "function_name": "get_turn_taking"}]}}}
-
+    frequency = None
     if 'calling_functions' in option_json:
 
         try:
@@ -1289,30 +1290,6 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",
 
                 frequency = int(calling_functions['frequency'])
                 function_list = calling_functions['function_list']
-
-                mod_of_time = datetime.datetime.now().second % frequency
-                for function_item in function_list:
-                    if function_item['from'] <= mod_of_time <= function_item['to']:
-                        function_name = function_item['function_name']
-                        if function_name in allowed_function_list:
-                            if function_name in ['get_vocab_coverage','get_issued_prompts']:
-                                kwargs = {"session_string": session_string, "option_settings": option_json,
-                                          "username": username,
-                                          "google_userid": google_userid,"google_part_of_email":google_part_of_email }
-                            else:
-                                kwargs = {"session_string": session_string,
-                                          "google_userid": google_userid,
-                                          "google_part_of_email":google_part_of_email }
-
-                            data = globals()[function_name](**kwargs)
-                            return data
-                        else:
-                            data = {"notification": {"text": f"Function {function_name} for {section} is not available"},
-                                    "heading": "Error in Arbitrary option setting:",
-                                    "setting":
-                                        {"duration": 2000}
-                                    }
-                            return data
 
         except KeyError as e:
             data = {"notification": {"text": "Exception KeyError error occured:" + e.args[0] + \
@@ -1329,6 +1306,37 @@ def dynamic_function_call(option_json={}, session_string="",section="/show",
                              {"duration": 2000}
                          }
             return data
+    # function list in database
+    df_calling_functions, df_frequency = build_calling_function(userid = google_userid,section=section)
+    if df_calling_functions is not None:
+        frequency = df_frequency
+        function_list = df_calling_functions['function_list']
+    if frequency is None:
+        return None
+
+    mod_of_time = datetime.datetime.now().second % frequency
+    for function_item in function_list:
+        if function_item['from'] <= mod_of_time <= function_item['to']:
+            function_name = function_item['function_name']
+            if function_name in allowed_function_list:
+                if function_name in ['get_vocab_coverage', 'get_issued_prompts']:
+                    kwargs = {"session_string": session_string, "option_settings": option_json,
+                              "username": username,
+                              "google_userid": google_userid, "google_part_of_email": google_part_of_email}
+                else:
+                    kwargs = {"session_string": session_string,
+                              "google_userid": google_userid,
+                              "google_part_of_email": google_part_of_email}
+
+                data = globals()[function_name](**kwargs)
+                return data
+            else:
+                data = {"notification": {"text": f"Function {function_name} for {section} is not available"},
+                        "heading": "Error in Arbitrary option setting:",
+                        "setting":
+                            {"duration": 2000}
+                        }
+                return data
 
     return None
 
@@ -1747,6 +1755,141 @@ def get_vocab_frequency(session_string="",google_userid:str="",google_part_of_em
 
     return data_return
 
+
+def get_vocab_frequency_short(session_string="",google_userid:str="",google_part_of_email:str="",
+                        is_to_download:bool=False):
+
+    # last record needs processing after the session close
+    if session_string == "%":
+        df_freq_session = get_frequently_used_words(session="%")
+    else:
+        dbname = DB_NAME
+        conn = sqlite3.connect(dbname)
+
+        df_end_max = pd.read_sql("SELECT max(end) FROM caption where " + \
+                                      " session = '" + session_string + "'"
+                                      , conn)
+        conn.commit()
+        conn.close()
+
+        if df_end_max is not None:
+            last_processed_time = pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime()
+            if ((last_processed_time + datetime.timedelta(minutes=2)) < datetime.datetime.now()):
+                print("updated due to max elapsed time")
+                df = vocab_calculate_all(session_string=session_string, since_last_update=True, include_last_record=True)
+                vocab_result_save(df=df, db_target_name="vocab_aggregate")
+        retrieve_last_vocab =  pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime() - datetime.timedelta(minutes=2)
+        df_freq_session = get_frequently_used_words(session=session_string,start=retrieve_last_vocab)
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df_start_min_per_session = pd.read_sql("SELECT session, min(start) FROM caption group by session", conn)
+    conn.commit()
+    conn.close()
+
+    # df_freq_session = remove_stopwords_entry(df=df_freq_session)
+    # "so" is included in stopwords -> no effects... The so could be missing in vocab_aggregate
+    if len(df_freq_session) == 0:
+        if is_to_download == True:
+            return None
+        share_text = f"<div>No frequency data for {session_string}</div>"
+        data_show = {"notification": {"text": share_text},
+                     "heading": "Frequency",
+                     "setting":
+                         {"duration": 500}
+                     }
+        data_return = jsonify(data_show)
+
+        return data_return
+
+    # df_freq_session = df_freq_session[(df_freq_session['count(vocab)'] > 1) & (df_freq_session['level'] >= "B1")]
+    # count(vocab), vocab, start, session, level
+    df_freq_session.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
+    share_text = '<br>'
+    share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">'
+    share_text += f'<span style="width:120p;display:inline-block" class="head">word</span>' \
+                  f'<span style="width:82px;display:inline-block" class="head">level</span>' \
+                  f'<span style="width:24px;display:inline-block" class="head">frequency</span>' \
+                  f'</div>'
+    share_text += '<br><br><br>'
+    #TODO allow config
+    # for index, row in df_freq_session[0:100].iterrows():
+    word_count = df_freq_session['count(vocab)'].sum()
+    df_freq_session_all = df_freq_session.groupby(['level','vocab']).sum()
+    df_freq_session_all = pd.DataFrame(df_freq_session_all.reset_index())
+    df_freq_session_all['ngsl'] = pd.Series( [ dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_session_all['vocab'] ])
+    df_freq_session_all = df_freq_session_all[df_freq_session_all['count(vocab)'] >= (
+    df_freq_session_all[df_freq_session_all['count(vocab)'] >= 2].mean()['count(vocab)'])]
+    df_speaker_list = df_freq_session.drop_duplicates(subset=['actor'])
+    df_speaker_list_string = "/".join([a for a in df_speaker_list['actor']])
+    share_text += f'<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">all speakers: {df_speaker_list_string} words({str(word_count)})</div>'
+    share_text += '<br><br><br>'
+    df_freq_session_all.sort_values(['level','count(vocab)'],ascending=[False,False], inplace=True)
+    for index, row in df_freq_session_all.iterrows():
+        share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+        share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
+                      f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}/{row["ngsl"]}</span>' \
+                      f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
+        share_text += '</div>'
+
+    df_all_breakdown = None
+    for speaker_index, speaker_item in df_speaker_list.iterrows():
+        df_freq_each_speaker =df_freq_session[df_freq_session['actor']==speaker_item['actor']]
+        # df_freq_each_speaker TODO: remove duplicate
+        word_count = df_freq_each_speaker['count(vocab)'].sum()
+        df_freq_each_speaker_group = df_freq_each_speaker.groupby(['level','vocab']).sum()
+        df_freq_each_speaker_group = pd.DataFrame(df_freq_each_speaker_group.reset_index())
+        df_freq_each_speaker = df_freq_each_speaker_group
+        df_freq_each_speaker['ngsl'] = pd.Series(
+            [dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_each_speaker['vocab']])
+        df_freq_each_speaker.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
+        share_text += '<br><br><br>'
+        share_text += f'<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">Speaker:{speaker_item["actor"]} words({str(word_count)})</div>'
+        share_text += '<br><br><br>'
+        for index, row in df_freq_each_speaker.iterrows():
+            share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+            share_text += f'<span style="width:120px;font-size:16px;display:inline-block;word-wrap: break-word;height:12px;margin:0;padding:0px;">{row["vocab"]}</span>' \
+                          f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["level"]}/{row["ngsl"]}</span>' \
+                          f'<span style="width:24px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["count(vocab)"]}</span>'
+            share_text += '</div>'
+
+        df_freq_each_speaker = df_freq_session[df_freq_session['actor'] == speaker_item['actor']]
+        word_count = df_freq_each_speaker['count(vocab)'].sum()
+        df_freq_each_speaker_group = df_freq_each_speaker.groupby(['level','vocab','session']).sum()
+        df_freq_each_speaker_per_session = df_freq_each_speaker.groupby(['session']).sum()
+        df_freq_each_speaker_per_session = pd.DataFrame(df_freq_each_speaker_per_session.reset_index())
+        df_freq_each_speaker_group = pd.DataFrame(df_freq_each_speaker_group.reset_index())
+        df_freq_each_speaker = df_freq_each_speaker_group
+        df_freq_each_speaker['ngsl'] = pd.Series(
+            [dict_ngsl_level[a] if (a in dict_ngsl_level) else "" for a in df_freq_each_speaker['vocab']])
+        df_freq_each_speaker.sort_values(['vocab'], ascending=[False], inplace=True)
+        df_freq_each_speaker['actor'] = str(speaker_item['actor'])
+        df_freq_each_speaker['session_total'] = pd.Series([df_freq_each_speaker_per_session[df_freq_each_speaker_per_session['session'] == a['session']]['count(vocab)'].values[0] for index,a in df_freq_each_speaker.iterrows()])
+        df_freq_each_speaker['session_time'] = pd.Series([df_start_min_per_session[
+                                                               df_start_min_per_session['session'] == a[
+                                                                   'session']]['min(start)'].values[0] for index, a in
+                                                           df_freq_each_speaker.iterrows()])
+        df_freq_each_speaker['session_time'] = pd.to_datetime(df_freq_each_speaker['session_time']).dt.strftime("%Y-%m-%d %H")
+
+        if df_all_breakdown is None:
+            df_all_breakdown = df_freq_each_speaker.copy()
+        else:
+            df_all_breakdown = pd.concat([df_all_breakdown, df_freq_each_speaker])
+    if is_to_download == True:
+        return df_all_breakdown
+    df_all_breakdown.to_csv("all_frequency.txt",sep="\t")
+
+    share_text += "</div>"
+    data_show = {"notification": {"text": share_text},
+                 "heading": "Frequency",
+                 "setting":
+                     {"duration": 500}
+                 }
+    data_return = jsonify(data_show)
+
+    return data_return
+
+
 def get_turn_taking(session_string="",google_userid:str="",google_part_of_email:str=""):
 
     dbname = DB_NAME
@@ -2133,13 +2276,55 @@ def is_allowed_to_access(session_id:str="",access_user:str=""):
                                                , conn)
         conn.close()
         if len(df_session_internal_code) == 0:
-            return [False,None]
+            conn_session = sqlite3.connect(DB_NAME_AUTH)
+
+            df_session_auth = pd.read_sql(
+                "SELECT * from session_internal_mapping where session_id_parent = '" + session_id + "'" +
+                " and " +
+                "connection_type = '" + REL_SESSION_GRANTED_ID + "' and "
+                "owner = '" + access_user + "'"
+                , conn_session)
+            conn_session.close()
+            if len(df_session_auth) == 0:
+                return [False,None]
+            else:
+                dbname = DB_NAME
+                conn = sqlite3.connect(dbname)
+
+                df_session_internal_code = pd.read_sql("SELECT * from session_internal_code where"
+                                                       " session_id = '" + session_id + "'"
+                                                       , conn)
+                conn.close()
+                ext_name = df_session_internal_code['external_session_name'].values[0]
+                return [True, ext_name]
         else:
             ext_name = df_session_internal_code['external_session_name'].values[0]
             return [True,ext_name]
     except Exception as e:
         print(e)
         return [False,None]
+
+def create_sessionid(session_string:str="",owner:str=""):
+
+    if session_string == "" or owner == "":
+        return None
+
+    created_on_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    df_new = pd.DataFrame(
+        columns=['external_session_name', 'owner', 'created_on'])
+    tmp_se = pd.Series({
+        'external_session_name': session_string,
+        'owner': owner,
+        'created_on': created_on_datetime,
+    }, index=df_new.columns)
+    df_new = df_new.append(tmp_se, ignore_index=True)
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    df_new.to_sql('session_internal_code', conn, if_exists='append', index=False)
+    conn.commit()
+    conn.close()
+
 
 def get_sessionid(session_string:str="",owner:str="",create_if_not_exists:bool=False):
 
@@ -2159,7 +2344,35 @@ def get_sessionid(session_string:str="",owner:str="",create_if_not_exists:bool=F
         if len(df_session_internal_code) == 0:
             dbname = DB_NAME
             conn = sqlite3.connect(dbname)
+            df_session_internal_code_without_owner = pd.read_sql("SELECT * from session_internal_code where"
+                                                   " external_session_name = '" + session_string + "'"
+                                                   , conn)
             conn.close()
+            if (len(df_session_internal_code_without_owner) != 0):
+                conn_session = sqlite3.connect(DB_NAME_AUTH)
+                list_of_subscribing = ', '.join(
+                    str(i) for i in df_session_internal_code_without_owner['session_id'].values)
+                df_session_internal_codelist_to_merge = pd.read_sql("SELECT * from session_internal_mapping where" +
+                                                                    " session_id_parent in (" + list_of_subscribing + ") and " +
+                                                                    " connection_type = '" + REL_SESSION_GRANTED_ID + "' and " +
+                                                                    " owner = '" + owner + "'"
+                                                                    , conn_session)
+                conn_session.close()
+                dbname = DB_NAME
+                conn = sqlite3.connect(dbname)
+                if len(df_session_internal_codelist_to_merge) != 0:
+                    session_id = df_session_internal_codelist_to_merge['session_id_parent'].values[-1]
+                    session_id = str(session_id)
+
+                df_session_internal_code = pd.read_sql("SELECT * from session_internal_code where"
+                                                       " session_id = '" + session_id + "'"
+                                                       , conn)
+                conn.close()
+                if len(df_session_internal_code) != 0:
+                    session_id = df_session_internal_code['session_id'].values[0]
+                    session_id = str(session_id)
+                    return session_id
+
             df_session_id_created = None
             if create_if_not_exists == True:
                 created_on_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -2366,6 +2579,7 @@ def toppage():
     given_name = None
     email = None
     userid, given_name, email,expires_in = get_browser_session_authentication()
+    userid = str(userid)[:3] +  "(hidden)" + str(userid)[-3:]
     kwargs = {"userid" : userid, "given_name" : given_name, "email": email,"expires_in":expires_in}
     text = render_template('lca_toppage.html',**kwargs )
     return text
@@ -2378,6 +2592,7 @@ def index():
     given_name = None
     email = None
     userid, given_name, email, __ = get_browser_session_authentication()
+    userid = str(userid)[:3] +  "(hidden)" + str(userid)[-3:]
     kwargs = {"userid" : userid, "given_name" : given_name, "email": email}
 
     text = render_template('lca_index.html', **kwargs)
@@ -2540,35 +2755,6 @@ def credentials_to_dict(credentials):
           'client_secret': credentials.client_secret,
           'scopes': credentials.scopes}
 
-def list_session(google_userid:str="",email:str="",start_str:str="",end_str:str=""):
-    df_session_internal_codelist = None
-    # start_str = request.form.get("start_date",None)
-    # end_str = request.form.get("end_date",None)
-    try:
-        dbname = DB_NAME
-        conn = sqlite3.connect(dbname)
-        where_clause_string = ""
-        if start_str != '':
-            where_clause_string += " and created_on >= '" + start_str + "'"
-        if end_str != '':
-            time_int = datetime.datetime.strptime(end_str,"%Y-%m-%d")
-            time_int = time_int + datetime.timedelta(hours=23,minutes=59,seconds=59)
-            end_str_int = time_int.strftime("%Y-%m-%d %H:%M:%S")
-
-            where_clause_string += " and created_on <= '" + end_str_int + "'"
-
-        df_session_internal_codelist = pd.read_sql("SELECT * from session_internal_code where"
-                                               " owner = '" + google_userid + "'"
-                                               + where_clause_string
-                                               , conn)
-        conn.close()
-        if len(df_session_internal_codelist) == 0:
-            df_session_internal_codelist = pd.DataFrame()
-            df_session_internal_codelist.columns=['id','external_session_name']
-
-    except Exception as e:
-        print(e)
-    return df_session_internal_codelist
 
 @app.route('/list_session', methods=['POST', 'GET'])
 def list_session_main():
@@ -2576,8 +2762,18 @@ def list_session_main():
     google_userid, google_part_of_email = get_user_id_from_session()
     start_str = request.form.get("start_date",None)
     end_str = request.form.get("end_date",None)
-    df_session_internal_codelist = list_session(google_userid=google_userid,email = google_part_of_email,
-                        start_str=start_str,end_str=end_str)
+    session_name = request.form.get("session_name", None)
+    if "search" in request.form:
+        df_session_internal_codelist = list_session(google_userid=google_userid,email = google_part_of_email,
+                            start_str=start_str,end_str=end_str)
+    elif "create" in request.form:
+        create_sessionid(session_string=session_name,owner=google_userid)
+        df_session_internal_codelist = list_session(google_userid=google_userid,email = google_part_of_email,
+                            start_str=start_str,end_str=end_str)
+    else:
+        df_session_internal_codelist = list_session(google_userid=google_userid,email = google_part_of_email,
+                            start_str=start_str,end_str=end_str)
+
     kwargs = {}
 
     kwargs["df_list"] = df_session_internal_codelist
@@ -2610,6 +2806,60 @@ def personalize_for_session_settings_main():
     text = personalize_for_session_settings(session_string=session_string,email_part=google_part_of_email)
     return text
 
+@app.route('/personalize_session_accept_authorization', methods=['POST', 'GET'])
+def personalize_session_accept_authorization_main():
+
+    google_userid, google_part_of_email = get_user_id_from_session(force_no_mask=True)
+    text = personalize_session_accept_authorization(email_part=google_part_of_email,userid = google_userid)
+    return text
+
+@app.route('/personalize_session_authorization', methods=['POST', 'GET'])
+def personalize_for_session_authorization_main():
+
+    session_string_str = request.form.get("session_id",None)
+    session_string_internal_str = request.form.get("internal_session_id",None)
+    if request.method == "GET":
+        session_string_internal_str = request.args.get('session')
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if session_string_internal_str is None:
+        session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
+        session_string = session_id
+    else:
+        session_access_allowed, external_session_name = is_allowed_to_access(session_id=session_string_internal_str,
+                                                                             access_user=google_userid)
+        if session_access_allowed == False:
+            return f"No authorization to read session {session_string_internal_str}"
+        else:
+            session_string = session_string_internal_str
+            session_string_str = external_session_name
+    text = personalize_for_session_authorization(session_string=session_string,ext_session_name = session_string_str,
+                                                 email_part=google_part_of_email,userid = google_userid)
+    return text
+
+
+@app.route('/grant_access_via_token', methods=['GET'])
+def grant_token_for_session_main():
+
+    token_string = request.args.get("token",None)
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if token_string is None:
+        return "Token not passed. Invalid request to have authorization granted"
+    if google_userid is None:
+        return "You haven't authenticate yourself, yet. Login first at <a href='"+ request.host_url +"'>here</a>"
+
+    text = grant_token_for_session(token_string = token_string,
+                                   email_part=google_part_of_email,userid = google_userid)
+    return text
+
+@app.route('/personalize_calling_function', methods=['POST','GET'])
+def personalize_calling_function_main():
+
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if google_userid is None:
+        return flask_redirect("authorize")
+    text = personalize_calling_function(email_part=google_part_of_email,userid = google_userid)
+    return text
+
 @app.route('/get_vocab', methods=['POST', 'GET'])
 def get_vocabs():
 
@@ -2621,7 +2871,7 @@ def get_vocabs():
 def show_text_from_url_main():
     text = show_text_from_url()
     return text
-def get_user_id_from_session():
+def get_user_id_from_session(force_no_mask:bool=False):
     import google.oauth2.credentials
     import google_auth_oauthlib.flow
     import googleapiclient.discovery
@@ -2642,7 +2892,10 @@ def get_user_id_from_session():
     try:
         userinfo = userinfo_service.userinfo().get().execute()['id']
         useremail= userinfo_service.userinfo().get().execute()['email']
-        account_email = mask_email_address(useremail=useremail)
+        if force_no_mask == False:
+            account_email = mask_email_address(useremail=useremail)
+        else:
+            account_email = useremail
     except Exception as e:
         print('An error occurred: %s', e)
         if (e.args[1]['error'] == "invalid_grant"):
@@ -2710,13 +2963,7 @@ def get_user_id(token:str=""):
 
     return userid, account_email, expires_at, expires_in
 
-def mask_email_address(useremail:str=""):
-    if useremail != "":
-        account_email = useremail.split('@')[0][0] + "(not stored)" + \
-                        useremail.split('@')[0][-2:]
-    else:
-        account_email = "No email provided"
-    return account_email
+
 
 def credentials_to_dict(credentials):
   return {'token': credentials.token,
@@ -2885,6 +3132,30 @@ def create_db():
         'internally_expire_at DATETIME(6),'
         'account_mail VARCHAR(20) )'
     )
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS session_internal_mapping('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'session_id_parent INTEGER,'
+        'connection_type VARCHAR(10),'
+        'session_id_child INTEGER,'
+        'token VARCHAR(40),'
+        'email VARCHAR(80),'
+        'owner VARCHAR(40),'
+        'created_on DATETIME(6)'
+        ')'
+    )
+
+    cur.execute(
+        'CREATE TABLE  IF NOT EXISTS calling_function('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'owner VARCHAR(60),'
+        'area TEXT,'
+        'function TEXT,'
+        'start INTEGER,'
+        'end INTEGER'        
+        ')'
+    )
+
     conn.commit()
     conn.close()
 

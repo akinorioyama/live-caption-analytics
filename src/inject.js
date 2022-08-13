@@ -45,6 +45,9 @@ try {
   let speava_access_token_validuntil = null;
   let isLoggedIn = false;
   let token_expire_interval = null;
+  let isInDisplayEdit = false;
+  let is_controlkey_on = false;
+  let is_key_on_escape = false;
   // -------------------------------------------------------------------------
   // CACHE is an array of speakers and comments
   //
@@ -487,7 +490,7 @@ try {
       speava_server_username = items.speava_session_username;
       speava_session_log_string = items.speava_session_log_string;
       speava_session_send_raw =             items.speava_session_send_raw
-      speava_session_post =                 items.speava_session_post  
+      speava_session_post =                 items.speava_session_post
       speava_session_show =                 items.speava_session_show
       speava_session_notification =         items.speava_session_notification
       speava_session_unrecognized =         items.speava_session_unrecognized
@@ -646,7 +649,200 @@ try {
     isTranscribing ? stopTranscribing() : startTranscribing()
     isTranscribing = !isTranscribing;
   }
+  const toggleDisplay =() => {
+    isInDisplayEdit ? stopDisplayFormat() :  startDisplayFormat()
+    isInDisplayEdit = !isInDisplayEdit;
+  }
+  const stopDisplayFormat = () => {
+    apply_opacity(1);
+  }
+  const startDisplayFormat = () => {
+    apply_opacity(0.5);
+    const msg_string_display_format = chrome.i18n.getMessage("prompt_during_edit");
+    toast_to_notify(msg_string_display_format,5000);  // "authentication stopped or failed."
 
+  }
+  const return_false = () => {
+    return false;
+  }
+
+  const mousedown_handling = (event) => {
+    let shiftX = event.clientX - event.target.getBoundingClientRect().left;
+    let shiftY = event.clientY - event.target.getBoundingClientRect().top;
+
+    moveAt(event.pageX, event.pageY);
+
+    function moveAt(pageX, pageY) {
+      event.target.style.left = pageX - shiftX + 'px';
+      event.target.style.top = pageY - shiftY + 'px';
+    }
+
+    function moveControl(pageX,pageY){
+      event.target.style.bottom = String(pageY) + 'px';
+      event.target.style.right = String(pageX ) + 'px';
+    }
+
+    function onMouseMove(event) {
+      if (is_controlkey_on === true){
+        moveControl(event.pageX, event.pageY);
+      } else {
+        moveAt(event.pageX, event.pageY);
+      }
+      if (isInDisplayEdit == false){
+        stopDisplayFormat();
+        // event.target.events.removeEventListener('mousemove',onMouseMove())
+      }
+
+    }
+    document.addEventListener('mousemove', onMouseMove);
+    document.onmouseup = function() {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.onmouseup = null;
+    };
+  }
+
+  const apply_opacity = (style_opacity) => {
+    // const notification_area = document.getElementById("speava_caption_container");
+    // speava_session_notification
+    // speava_caption_reaction
+    // speava_buttons
+    const speava_session_notification = document.getElementById("speava_session_notification");
+    const speava_caption_reaction = document.getElementById("speava_caption_reaction");
+    const speava_buttons = document.getElementById("speava_buttons");
+
+    const feedback_textarea = document.getElementById("speava_textarea");
+    const speava_all_others = document.getElementById("speava_all_others");
+    const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
+    const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
+    const speava_valid_thru_text = document.getElementById("speava_valid_thru");
+    const text_color = speava_valid_thru_text.style.color;
+    if (style_opacity === 1){
+      text_color_inverted = ""
+    } else {
+      if (text_color == "") {
+        text_color_inverted = "";
+      } else {
+        let colorAttribute = text_color.slice(
+            text_color.indexOf("(") + 1,
+            text_color.indexOf(")")
+        ).split(", ");
+        const string_rgb_r = String(parseInt(colorAttribute[0]) - 30);
+        const string_rgb_g = String(parseInt(colorAttribute[1]) - 30);
+        const string_rgb_b = String(parseInt(colorAttribute[2]) - 30);
+        text_color_inverted = 'rgb(' + string_rgb_r + ',' + string_rgb_g + ',' + string_rgb_b + ')';
+      }
+    }
+
+    if (speava_all_others) {
+      speava_all_others.style.opacity = style_opacity;
+      speava_all_others.style.background = text_color_inverted;
+    }
+    if (fixed_part_of_utterance) {
+      fixed_part_of_utterance.style.opacity = style_opacity;
+      fixed_part_of_utterance.style.background = text_color_inverted;
+    }
+    if (interim_part_of_utterance){
+      interim_part_of_utterance.style.opacity = style_opacity;
+      interim_part_of_utterance.style.background = text_color_inverted;
+    }
+    // if (notification_area){
+    //   notification_area.style.opacity = style_opacity;
+    //   notification_area.style.background = text_color_inverted;
+    // }
+    if (feedback_textarea){
+      feedback_textarea.style.opacity = style_opacity;
+      feedback_textarea.style.background = text_color_inverted;
+    }
+    if (speava_valid_thru_text){
+      speava_valid_thru_text.style.opacity = style_opacity;
+      speava_valid_thru_text.style.background = text_color_inverted;
+    }
+    if (speava_session_notification){
+      speava_session_notification.style.opacity = style_opacity;
+      speava_session_notification.style.background = text_color_inverted;
+    }
+    if (speava_caption_reaction){
+      speava_caption_reaction.style.opacity = style_opacity;
+      speava_caption_reaction.style.background = text_color_inverted;
+    }
+    if (speava_buttons){
+      speava_buttons.style.opacity = style_opacity;
+      speava_buttons.style.background = text_color_inverted;
+    }
+
+    if (style_opacity !== 1){
+      if (speava_all_others) {
+        speava_all_others.addEventListener('mousedown', mousedown_handling);
+        speava_all_others.addEventListener( 'dragstart',return_false);
+      }
+      if (fixed_part_of_utterance) {
+        fixed_part_of_utterance.addEventListener('mousedown', mousedown_handling);
+        fixed_part_of_utterance.addEventListener( 'dragstart',return_false);
+      }
+      if (interim_part_of_utterance){
+        interim_part_of_utterance.addEventListener('mousedown', mousedown_handling);
+        interim_part_of_utterance.addEventListener( 'dragstart',return_false);
+      }
+      // if (notification_area){
+      //   notification_area.addEventListener('mousedown', mousedown_handling);
+      //   notification_area.addEventListener( 'dragstart',return_false);
+      // }
+      if (feedback_textarea){
+        feedback_textarea.addEventListener('mousedown', mousedown_handling);
+        feedback_textarea.addEventListener( 'dragstart',return_false);
+      }
+      if (speava_session_notification){
+        speava_session_notification.addEventListener('mousedown', mousedown_handling);
+        speava_session_notification.addEventListener( 'dragstart',return_false);
+      }
+
+      if (speava_caption_reaction){
+        speava_caption_reaction.addEventListener('mousedown', mousedown_handling);
+        speava_caption_reaction.addEventListener( 'dragstart',return_false);
+      }
+
+      if (speava_buttons){
+        speava_buttons.addEventListener('mousedown', mousedown_handling);
+        speava_buttons.addEventListener( 'dragstart',return_false);
+      }
+    } else {
+      document.onmousemove = null;
+      if (speava_all_others) {
+        speava_all_others.removeEventListener('mousedown', mousedown_handling);
+        speava_all_others.removeEventListener( 'dragstart',return_false);
+      }
+      if (fixed_part_of_utterance) {
+        fixed_part_of_utterance.removeEventListener('mousedown', mousedown_handling);
+        fixed_part_of_utterance.removeEventListener( 'dragstart',return_false);
+      }
+      if (interim_part_of_utterance){
+        interim_part_of_utterance.removeEventListener('mousedown', mousedown_handling);
+        interim_part_of_utterance.removeEventListener( 'dragstart',return_false);
+      }
+      // if (notification_area){
+      //   notification_area.removeEventListener('mousedown', mousedown_handling);
+      //   notification_area.removeEventListener( 'dragstart',return_false);
+      // }
+      if (feedback_textarea){
+        feedback_textarea.removeEventListener('mousedown', mousedown_handling);
+        feedback_textarea.removeEventListener( 'dragstart',return_false);
+      }
+      if (speava_session_notification){
+        speava_session_notification.removeEventListener('mousedown', mousedown_handling);
+        speava_session_notification.removeEventListener( 'dragstart',return_false);
+      }
+      if (speava_caption_reaction){
+        speava_caption_reaction.removeEventListener('mousedown', mousedown_handling);
+        speava_caption_reaction.removeEventListener( 'dragstart',return_false);
+      }
+      if (speava_buttons){
+        speava_buttons.removeEventListener('mousedown', mousedown_handling);
+        speava_buttons.removeEventListener( 'dragstart',return_false);
+      }
+    }
+
+
+  }
   ////////////////////////////////////////////////////////////////////////////
   // Transcript reading, writing, and deleting
   ////////////////////////////////////////////////////////////////////////////
@@ -901,9 +1097,11 @@ try {
 
       cache.count += 1;
       cache.endedAt = new Date();
-
+      cache.text = getCaptionData(node).text
+      setSpeaker(cache);
       cache.debounce = setInterval(
         tryTo(() => {
+          console.log("setInterval<-cache.debounce");
           cache.text = getCaptionData(node).text;
           // debug('count', cache.count, 'polls', cache.pollCount);
           setSpeaker(cache);
@@ -1043,113 +1241,135 @@ try {
     const nodes = Array.from(document.querySelectorAll('img')).filter((node) => {
         return node.src.match(/\.googleusercontent\.com\//);
     });
-
-    for (let node of nodes) {
-      if (!(node.clasName in nodesByClass)) {
-        nodesByClass[node.className] = [];
-      }
-
-      nodesByClass[node.className].push(node);
-    }
-
     const candidates = [];
 
-    for (let classNodes of Object.values(nodesByClass)) {
-      let matches = 0;
-
-      for (let node of classNodes) {
-        const spans = document.evaluate(`..//span`, node.parentElement, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE);
-
-        let span;
-
-        while (span = spans.iterateNext()) {
-          if (span.children.length === 0 && span.textContent.length > 3) {
-            matches += 1;
+    for (let node of nodes) {
+      const test_nodes = document.evaluate(`..//span`, node.parentElement, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE);
+      let speaker = "";
+      let speaker_caption = "";
+      if (node.nextSibling !== null){
+        if (node.nextSibling.textContent === null){
+          continue;
+        } else {
+        speaker = node.nextSibling.textContent;
+         if (node.nextSibling.nextSibling !== null){
+            speaker_caption = node.nextSibling.nextSibling.textContent;
+            //console.log(node.getAttribute("data-iml")+speaker+speaker_caption);
+            candidates.push(node.parentNode.parentNode);
+            // already narrowed down to the leading block
             break;
-          }
-        }
-      }
 
-      if (matches !== classNodes.length) {
+         } else {
+          continue;
+         }
+         }
+      } else {
         continue;
       }
-
-      let candidate = null;
-
-      if (classNodes.length >= 2) {
-        const nodeCopy = [...classNodes];
-        let current = null;
-        let noSharedCommonAncestor = false;
-
-        do {
-          for (let i in nodeCopy) {
-            if (!nodeCopy[i].parent) {
-              noSharedCommonAncestor = true;
-              break;
-            }
-
-            nodeCopy[i] = nodeCopy[i].parent;
-
-            if (i === 0) {
-              current = nodeCopy[i];
-            } else if (current && current !== nodeCopy[i]) {
-              current = null;
-            }
-          }
-        } while (current === null && noSharedCommonAncestor === false);
-
-        candidate = current;
-
-      } else {
-        let node = classNodes[0];
-
-        while (candidate === null && node) {
-          if (node.getAttribute('jscontroller')) {
-            candidate = node;
-          } else {
-            node = node.parentNode;
-          }
-        }
-      }
-
-      if (candidate) {
-        const windowWidth = window.innerWidth;
-
-        const rect = candidate.children[0].children[0].children[0].getBoundingClientRect();
-        const isCentered = Math.abs(rect.x - rect.left) < 10;
-        const isThreeFifthsWidth = ((3/5)-0.1< ((rect.width) / windowWidth)) && (((rect.width) / windowWidth)< (3/5)+0.1);
-
-        const isLeftAligned = rect.left < (windowWidth * .2);
-        const isNotRightAligned = rect.right < (windowWidth * .9);
-        const isWiderThanHalf = rect.right > (windowWidth * .5);
-
-        // NOTE: could be more precise about location
-        // NOTE: could explore factors that lead one of these situations to be
-        //       true and then only accept candidates matching the expected case
-        let caption_container_style = null;
-        try {
-          parsed_json = JSON.parse(speava_session_option_string);
-          if ('caption_container_style' in parsed_json){
-            caption_container_style = parsed_json["caption_container_style"];
-          }
-        } catch (e) {
-//
-        }
-
-        if (isCentered && isThreeFifthsWidth ||
-            isLeftAligned && isNotRightAligned && isWiderThanHalf ||
-            candidate.classList.contains(caption_container_style)) {
-          const person = xpath('.//div/text()', candidate);
-          if (person){
-            if (person.textContent==="Meeting host"){
-              console.log("Meeting host - skipped")
-            } else {
-              candidates.push(candidate);
-            }
-          }
-        }
-      }
+      // if (!(node.clasName in nodesByClass)) {
+      //   nodesByClass[node.className] = [];
+      // }
+      //
+      // nodesByClass[node.className].push(node);
     }
+    // const candidates = [];
+//
+//     for (let classNodes of Object.values(nodesByClass)) {
+//       let matches = 0;
+//
+//       for (let node of classNodes) {
+//         const spans = document.evaluate(`..//span`, node.parentElement, null, XPathResult.ORDERED_NODE_ITERATOR_TYPE);
+//
+//         let span;
+//
+//         while (span = spans.iterateNext()) {
+//           if (span.children.length === 0 && span.textContent.length > 3) {
+//             matches += 1;
+//             break;
+//           }
+//         }
+//       }
+//
+//       if (matches !== classNodes.length) {
+//         continue;
+//       }
+//
+//       let candidate = null;
+//
+//       if (classNodes.length >= 2) {
+//         const nodeCopy = [...classNodes];
+//         let current = null;
+//         let noSharedCommonAncestor = false;
+//
+//         do {
+//           for (let i in nodeCopy) {
+//             if (!nodeCopy[i].parent) {
+//               noSharedCommonAncestor = true;
+//               break;
+//             }
+//
+//             nodeCopy[i] = nodeCopy[i].parent;
+//
+//             if (i === 0) {
+//               current = nodeCopy[i];
+//             } else if (current && current !== nodeCopy[i]) {
+//               current = null;
+//             }
+//           }
+//         } while (current === null && noSharedCommonAncestor === false);
+//
+//         candidate = current;
+//
+//       } else {
+//         let node = classNodes[0];
+//
+//         while (candidate === null && node) {
+//           if (node.getAttribute('jscontroller')) {
+//             candidate = node;
+//           } else {
+//             node = node.parentNode;
+//           }
+//         }
+//       }
+//
+//       if (candidate) {
+//         const windowWidth = window.innerWidth;
+//
+//         const rect = candidate.children[0].children[0].children[0].getBoundingClientRect();
+//         const isCentered = Math.abs(rect.x - rect.left) < 10;
+//         const isThreeFifthsWidth = ((3/5)-0.1< ((rect.width) / windowWidth)) && (((rect.width) / windowWidth)< (3/5)+0.1);
+//
+//         const isLeftAligned = rect.left < (windowWidth * .2);
+//         const isNotRightAligned = rect.right < (windowWidth * .9);
+//         const isWiderThanHalf = rect.right > (windowWidth * .5);
+//
+//         // NOTE: could be more precise about location
+//         // NOTE: could explore factors that lead one of these situations to be
+//         //       true and then only accept candidates matching the expected case
+//         let caption_container_style = null;
+//         try {
+//           parsed_json = JSON.parse(speava_session_option_string);
+//           if ('caption_container_style' in parsed_json){
+//             caption_container_style = parsed_json["caption_container_style"];
+//           }
+//         } catch (e) {
+// //
+//         }
+//
+//         if (isCentered && isThreeFifthsWidth ||
+//             isLeftAligned && isNotRightAligned && isWiderThanHalf ||
+//             candidate.classList.contains(caption_container_style)) {
+//           const person = xpath('.//div/text()', candidate);
+//           if (person){
+//             if (person.textContent==="Meeting host"){
+//               console.log("Meeting host - skipped")
+//             } else {
+//               candidates.push(candidate);
+//             }
+//           }
+//         }
+//       }
+//     }
 
     // return candidates.length === 1 ? candidates[0] : null;
 
@@ -1256,9 +1476,10 @@ try {
 
     // In my experience, I haven't seen the captions container disappear but it could if
     // the user disables and re-enables captions again.
-    if (captionsContainer) {
-      clearInterval(closedCaptionsAttachInterval);
-    }
+// 20220802
+    // if (captionsContainer) {
+    //   clearInterval(closedCaptionsAttachInterval);
+    // }
   };
 
   ////////////////////////////////////////////////////////////////////////////
@@ -1410,7 +1631,7 @@ try {
     }
 
     const processReceivedReplyNotification = (response) => {
-
+      try {
         response.json().then(function (json_text) {
             debug(json_text);
             let text_for_notification = "";
@@ -1442,6 +1663,10 @@ try {
               }
             }
         });
+      } catch (e) {
+        //console.log('catch', e);
+        speava_async_response_notification = null;
+      }
         // speava_async_response_notification = null;
     };
 
@@ -1779,7 +2004,10 @@ try {
               method: "POST",
               mode: "cors",
               body: JSON.stringify(obj)
-            });
+            }).catch(error => {
+              console.log(error);
+              speava_async_response_notification = null;
+        });
         speava_async_response_notification.then(processReceivedReplyNotification).catch(error => {
           if (error.name === "TypeError" ){
             show_unavailable_error("speava_session_notification");
@@ -1869,7 +2097,11 @@ try {
                     mode: "cors",
                     body: JSON.stringify(obj),
                     cache: "no-cache"
-                  });
+                  }).catch(error => {
+              console.log(error);
+              speava_async_response_prompt = null;
+              });
+
               speava_async_response_prompt.then(processReceivedReplyPrompt).catch(error => {
                 //console.log("int catch",error);
                 speava_async_response_prompt = null;
@@ -1905,7 +2137,11 @@ try {
                     mode: "cors",
                     body: JSON.stringify(obj),
                     cache: "no-cache"
-                  });
+                  }).catch(error => {
+              console.log(error);
+              speava_async_response_show = null;
+              });
+
               speava_async_response_show.then(processReceivedReplyShow).catch(error => {
                 if (error.name === "TypeError" ){
                   show_unavailable_error("speava_textarea");
@@ -1913,7 +2149,7 @@ try {
                 speava_async_response_show = null;
               });
             } catch (e) {
-              //console.log('catch', e);
+                speava_async_response_show = null;
             }
 
           }
@@ -1944,7 +2180,10 @@ try {
                   method: "POST",
                   mode: "cors",
                   body: JSON.stringify(obj)
-                });
+                }).catch(error => {
+              console.log(error);
+              speava_async_response = null;
+              });
             speava_async_response.then(processReceivedReply).catch(error => {
               //console.log("int catch",error);
               speava_async_response = null;
@@ -1996,7 +2235,7 @@ try {
       const elem = document.createElement('div');
       elem.id = "speava_textarea";
       elem.style.top = "0px"
-      elem.style.witdh = "300px"
+      // elem.style.witdh = "300px"
       elem.style.font.fontcolor(speava_session_text_color);
       const text = document.createTextNode('Show stats');
       const objBody = document.getElementsByTagName("body").item(0);
@@ -2180,20 +2419,23 @@ try {
       objBody.appendChild(elem);
       elem.appendChild(text);
 
-      const elem_upper_container = document.createElement('div');
-      elem_upper_container.id = "speava_caption_container";
-      objBody.appendChild(elem_upper_container);
+      // const elem_upper_container = document.createElement('div');
+      // elem_upper_container.id = "speava_caption_container";
+      // elem_upper_container.style.position = 'absolute';
+      // objBody.appendChild(elem_upper_container);
 
-      const obj_container = document.getElementById("speava_caption_container")
+      // const obj_container = document.getElementById("speava_caption_container")
 
       const elem_text_caption_reaction = document.createElement('div');
       elem_text_caption_reaction.id = "speava_caption_reaction";
-      obj_container.appendChild(elem_text_caption_reaction);
+      elem_text_caption_reaction.style.position = 'absolute';
+      objBody.appendChild(elem_text_caption_reaction);
 
       const elem_text_notification = document.createElement('div');
       elem_text_notification.id = "speava_session_notification";
+      elem_text_notification.style.position = 'absolute';
       elem_text_notification.tabIndex = 4;
-      obj_container.appendChild(elem_text_notification);
+      objBody.appendChild(elem_text_notification);
 
       isTextAreaCreated = true;
 
@@ -2233,9 +2475,11 @@ try {
       const url_icon_record = chrome.runtime.getURL("icons/icon_record.png");
       const url_icon_log = chrome.runtime.getURL("icons/icon_log.png");
       const url_icon_login = chrome.runtime.getURL("icons/icon_login.png");
+      const url_icon_display_fomrat = chrome.runtime.getURL("icons/icon_display.png");
 
       const reactionFocus_log_action = () => log_action(currentTranscriptId);
       const open_options = () => open_option_dialog();
+      const config_display = () => toggleDisplay();
       const _PNG_CONFIG = {
         viewBoxWidth: 448,
         viewBoxHeight: 512,
@@ -2266,6 +2510,12 @@ try {
         path: url_icon_login,
       };
 
+      const _PNG_DISPLAY_FORMAT = {
+        viewBoxWidth: 512,
+        viewBoxHeight: 512,
+        path: url_icon_display_fomrat,
+      };
+
       toggleButton_login.appendChild(makePng(_PNG_LOGIN, 36, 36, { id: ID_TOGGLE_BUTTON_LOGIN }));
       toggleButton.appendChild(makePng(_PNG_RECORD, 36, 36, { id: ID_TOGGLE_BUTTON }));
 
@@ -2282,6 +2532,13 @@ try {
       configButton.style.position = 'relative';
       configButton.style.float = 'left';
       configButton.appendChild(makePng(_PNG_CONFIG, 36, 36, { id: "config", onclick: open_options }));
+
+      const displayFormat_Button = document.createElement('div');
+      configButton.prepend(displayFormat_Button);
+      displayFormat_Button.style.display = 'flex';
+      displayFormat_Button.style.position = 'relative';
+      displayFormat_Button.style.float = 'bottom';
+      displayFormat_Button.appendChild(makePng(_PNG_DISPLAY_FORMAT, 36, 36, { id: "config_display", onclick: config_display }));
 
       const logButton = document.createElement('div');
       buttons.prepend(logButton);
@@ -2373,7 +2630,8 @@ try {
         window.alert(msg_string);
       }
     } else if (hostname.match("zoom") !== null){
-      cc_button_path = `//div[@class="join-audio-container"]`
+      // cc_button_path = `//div[@class="join-audio-container"]`
+      cc_button_path = `//div[@feature-type="newLTT"]`
       captionsContainer = findZoomCaptionContainer();
     } else {
       cc_button_path = `//div[@id="fixed_part_of_utterance"]`;
@@ -2434,14 +2692,21 @@ try {
 
   const applyFontColor = (font_color) => {
 
-    const notification_area = document.getElementById("speava_caption_container");
+    const speava_session_notification = document.getElementById("speava_session_notification");
+    const speava_caption_reaction = document.getElementById("speava_caption_reaction");
+    // const notification_area = document.getElementById("speava_caption_container");
     const feedback_textarea = document.getElementById("speava_textarea");
     const speava_all_others = document.getElementById("speava_all_others");
     const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
     const interim_part_of_utterance = document.getElementById("interim_part_of_utterance");
     const speava_valid_thru_text = document.getElementById("speava_valid_thru");
 
-
+    if (speava_session_notification){
+      speava_session_notification.style.color = font_color;
+    }
+    if (speava_caption_reaction){
+      speava_caption_reaction.style.color = font_color;
+    }
     if (speava_all_others) {
       speava_all_others.style.color = font_color;
     }
@@ -2451,9 +2716,9 @@ try {
     if (interim_part_of_utterance){
       interim_part_of_utterance.style.color = font_color;
     }
-    if (notification_area){
-      notification_area.style.color = font_color;
-    }
+    // if (notification_area){
+    //   notification_area.style.color = font_color;
+    // }
     if (feedback_textarea){
       feedback_textarea.style.color = font_color;
     }
@@ -2464,7 +2729,9 @@ try {
 
   const applyOptionStyles = () => {
 
-    const notification_area = document.getElementById("speava_caption_container");
+    // const notification_area = document.getElementById("speava_caption_container");
+    const speava_session_notification = document.getElementById("speava_session_notification");
+    const speava_caption_reaction = document.getElementById("speava_caption_reaction");
     const feedback_textarea = document.getElementById("speava_textarea");
     const speava_all_others = document.getElementById("speava_all_others");
     const fixed_part_of_utterance = document.getElementById("fixed_part_of_utterance");
@@ -2480,13 +2747,14 @@ try {
     let elem_others_style_width = null;
     let z_index = 65000;
     let notification_area_top = "0px";
+    let notification_area_bottom = "20%";
     let notification_area_right = null;
     let notification_area_left = null;
     let notification_area_width = null;
     let feedback_textarea_top = "0px";
-    let feedback_textarea_right = null;
+    let feedback_textarea_right = "85%";
     let feedback_textarea_left = null;
-    let feedback_textarea_width = "300px";
+    let feedback_textarea_width = null;
 
     try {
       parsed_json = JSON.parse(speava_session_window_positions);
@@ -2505,18 +2773,21 @@ try {
       if ('elem_others.style.width' in parsed_json){
         elem_others_style_width = parsed_json["elem_others.style.width"];
       }
-      if ('notification_area_top' in parsed_json){
-        notification_area_top = parsed_json["notification_area_top"];
-      }
-      if ('notification_area_right' in parsed_json) {
-        notification_area_right = parsed_json["notification_area_right"];
-      }
-      if ('notification_area_left' in parsed_json) {
-        notification_area_left = parsed_json["notification_area_left"];
-      }
-      if ('notification_area_width' in parsed_json) {
-        notification_area_width = parsed_json["notification_area_width"];
-      }
+      // if ('notification_area_top' in parsed_json){
+      //   notification_area_top = parsed_json["notification_area_top"];
+      // }
+      // if ('notification_area_bottom' in parsed_json){
+      //   notification_area_bottom = parsed_json["notification_area_bottom"];
+      // }
+      // if ('notification_area_right' in parsed_json) {
+      //   notification_area_right = parsed_json["notification_area_right"];
+      // }
+      // if ('notification_area_left' in parsed_json) {
+      //   notification_area_left = parsed_json["notification_area_left"];
+      // }
+      // if ('notification_area_width' in parsed_json) {
+      //   notification_area_width = parsed_json["notification_area_width"];
+      // }
       if ('feedback_textarea_top' in parsed_json){
         feedback_textarea_top = parsed_json["feedback_textarea_top"];
       }
@@ -2560,25 +2831,40 @@ try {
       fixed_part_of_utterance.style.zIndex = z_index;
       interim_part_of_utterance.style.zIndex = z_index;
     }
-    if (notification_area){
-      notification_area.style.zIndex = z_index;
-      notification_area.style.top = notification_area_top;
-      if (notification_area_width){
-        notification_area.style.width = notification_area_width;
-      }
-      if (!notification_area_right & !notification_area_left){
-        // to shift to right to show as default, if not requested
-        notification_area.style.left = "300px";
-      }
-      if (notification_area_right){
-        notification_area.style.right =  notification_area_right;
-        notification_area.style.removeProperty("left");
-      }
-      if (notification_area_left){
-        notification_area.style.left =  notification_area_left;
-        notification_area.style.removeProperty("right");
-      }
+    // if (notification_area){
+    //   notification_area.style.zIndex = z_index;
+    //   notification_area.style.top = notification_area_top;
+    //   notification_area.style.bottom = notification_area_bottom;
+    //   if (notification_area_width){
+    //     notification_area.style.width = notification_area_width;
+    //   }
+    //   if (!notification_area_right & !notification_area_left){
+    //     // to shift to right to show as default, if not requested
+    //     notification_area.style.left = "300px";
+    //   }
+    //   if (notification_area_right){
+    //     notification_area.style.right =  notification_area_right;
+    //     notification_area.style.removeProperty("left");
+    //   }
+    //   if (notification_area_left){
+    //     notification_area.style.left =  notification_area_left;
+    //     notification_area.style.removeProperty("right");
+    //   }
+    // }
+    // const speava_session_notification = document.getElementById("speava_session_notification");
+    // const speava_caption_reaction = document.getElementById("speava_caption_reaction");
+
+    if (speava_session_notification){
+      speava_session_notification.style.zIndex = z_index;
+      speava_session_notification.style.top = "10%";
+      speava_session_notification.style.bottom = "80%";
     }
+    if (speava_caption_reaction){
+      speava_caption_reaction.style.zIndex = z_index;
+      speava_caption_reaction.style.top = "20%";
+      speava_caption_reaction.style.bottom = "20%";
+    }
+
     if (buttons_for_command){
       buttons_for_command.style.zIndex = z_index;
       buttons_for_command.style.top = buttons_style_top;
@@ -2588,12 +2874,23 @@ try {
       speava_valid_thru_text.style.zIndex = z_index;
     }
   }
-
+  const setControlKeys_off = (e) => {
+    is_controlkey_on = false;
+  }
   const setShortcutKeys = (e) => {
     // no specific positions of elements guarantee the access to configuration button
     // The shortcut key below ensures access to the option function
     if (e) {
       let keycode_to_show_option = 56;
+      if (e.ctrlKey === true) {
+        is_controlkey_on = true;
+      } else {
+        is_controlkey_on = false;
+      }
+      if (e.key == "Escape"){
+        isInDisplayEdit = false
+        stopDisplayFormat();
+      }
       try {
         parsed_json = JSON.parse(speava_session_option_string);
         if ('keycode' in parsed_json) {
@@ -2779,6 +3076,7 @@ try {
   setInterval(sendData,500);
   setInterval(tryTo(fire_notification, 'firing notification'), 500);
   document.addEventListener('keydown',setShortcutKeys);
+  document.addEventListener('keyup',setControlKeys_off);
   ////////////////////////////////////////////////////////////////////////////
   // COLOR, STYLE, and SVG constants
   //

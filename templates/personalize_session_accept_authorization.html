@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Accept authorization invitation</title>
+</head>
+<body>
+<a href="/">Show start page</a>
+<form action="/personalize_session_accept_authorization" method="POST" enctype="multipart/form-data">
+<div>
+    <table>
+    <tr><td><b>List of allowed users (may have not been accepted)</b></td></tr>
+{% if (df_list is none): %}
+    <tr>
+        <td>No authorizaton is retrieved</td>
+        <td></td>
+    </tr>
+{% elif (df_list|length == 0): %}
+    <tr>
+        <td>No authorization are found</td>
+        <td></td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>id</td>
+        <td>internal session id</td>
+        <td>owner id</td>
+        <td>email</td>
+        <td>session name</td>
+        <td>action</a></td>
+    </tr>
+
+    {% for index, item in df_list.iterrows(): %}
+    <tr>
+        <td>{{item['id']}}</td>
+        <td>{{item['session_id']}}</td>
+        <td>{{item['owner']}}</td>
+        <td>{{item['email']}}</td>
+        <td>{{item['external_session_name']}}</td>
+        <td><button id="accept" name="accept_command" value="id={{item['id']}}">Accept</button></td>
+<!--        <td><a href="/personalize_session_authorization_remove?session={{internal_session_id}}&id={{item['id']}}">Remove</a></td>-->
+    </tr>
+{% endfor %}
+    {% endif %}
+
+</table>
+</div>
+
+	<input type="submit" value="Search">
+</form>
+
+
+    <style>
+        div.textarea {
+   height: 48px;
+   width: 100%;
+}
+        textarea {
+   position: relative;
+   height: 48px;
+   width: 100%;
+   transition: all 500ms;
+}
+        textarea:focus {
+   z-index: 1001;
+   min-height:250px;
+}
+    </style>
+
+<!--<script src="options.js"></script>-->
+</body>
+</html>

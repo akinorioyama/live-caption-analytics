@@ -6,7 +6,7 @@
     "js": "options.js"
   },
   "description": "Provide routes to send live captions to analytics servers.",
-  "version": "1.0.4.2",
+  "version": "1.0.4.3",
   "icons": {
     "128": "icons/icon.png"
   },
@@ -46,7 +46,7 @@
         "background.js",
         "options.html",
         "icons/icon_config.png","icons/icon_delete.png","icons/icon_circle.png","icons/icon_record.png","icons/icon_log.png",
-        "icons/icon_login.png",
+        "icons/icon_login.png","icons/icon_display.png",
         "css/style.css"],
       "matches": [ "https://meet.google.com/*",
                    "https://*.zoom.us/*",

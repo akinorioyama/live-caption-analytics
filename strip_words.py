@@ -43,10 +43,17 @@ import sys
 from nltk.stem.wordnet import WordNetLemmatizer as WNL
 import urllib.parse
 from flask import render_template
-
+import secrets
+from urllib.parse import parse_qs
+from session_model import list_session_subscribing_only
+from session_model import mask_email_address
+from session_model import allowed_function_list
 DB_NAME = "main.db"
 DB_NAME_SITE = "site.db"
-
+DB_NAME_AUTH = "session_auth.db"
+REL_SESSION_CHILDREN = "has_children_session"
+REL_SESSION_GRANT_TOKEN = "grant_token"
+REL_SESSION_GRANTED_ID = "grant_authorized"
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
 CORS(app)
@@ -377,6 +384,340 @@ def personalize_for_session_settings(session_string:str="",email_part:str=""):
     text = render_template('personalize_session_settings.html', **kwargs)
     return text
 
+
+def personalize_for_session_authorization(session_string:str="",email_part:str="",userid:str="",ext_session_name:str=""):
+
+    data = request.get_data().decode('utf-8')
+    text_authorized_names = request.form.get("text_authorized_names",None)
+    text_authorized_email_addresses = request.form.get("text_authorized_email_addresses",None)
+    session_string_str = request.form.get("session_id",None)
+    username = request.form.get("username",None)
+
+    kwargs = {}
+    for a in request.form.keys():
+        kwargs[a] =request.form.get(a)
+
+    if request.method == "GET":
+        session_string = request.args.get('session')
+        kwargs['internal_session_id'] = session_string
+
+    button_command_value = request.form.get("command",None)
+    if button_command_value == "speava_generate_token"  and session_string is not None:
+        session_in_int = int(session_string)
+        urlsafe_token = secrets.token_urlsafe(32)
+        print("token is requested",urlsafe_token)
+        conn = sqlite3.connect(DB_NAME_AUTH)
+        df_session_auth_token = pd.DataFrame([urlsafe_token])
+        df_session_auth_token.columns = ['token']
+        df_session_auth_token['session_id_parent'] = session_in_int
+        df_session_auth_token['connection_type'] = REL_SESSION_GRANT_TOKEN
+
+        df_session_auth_token.to_sql('session_internal_mapping', conn, if_exists='append', index=False)
+        conn.commit()
+        conn.close()
+
+    button_remove_email_command_value = request.form.get("remove_email_command",None)
+    if button_remove_email_command_value is not None:
+        remove_email_pair = parse_qs(button_remove_email_command_value)
+        remove_email_session = remove_email_pair['session'][0]
+        remove_email_id = remove_email_pair['id'][0]
+
+        conn_auth_email = sqlite3.connect( DB_NAME_AUTH)
+        sql_string = 'DELETE FROM session_internal_mapping where session_id_parent = "' + remove_email_session + '"' + \
+                     ' and id = "' + remove_email_id + '"'
+        conn_auth_email.execute(sql_string)
+
+        conn_auth_email.commit()
+        conn_auth_email.close()
+
+    button_remove_token_command_value = request.form.get("remove_token_command",None)
+    if button_remove_token_command_value is not None:
+        remove_token_pair = parse_qs(button_remove_token_command_value)
+        remove_token_session = remove_token_pair['session'][0]
+        remove_token_id = remove_token_pair['id'][0]
+
+        conn_auth_token = sqlite3.connect( DB_NAME_AUTH)
+        sql_string = 'DELETE FROM session_internal_mapping where session_id_parent = "' + remove_token_session + '"' + \
+                     ' and id = "' + remove_token_id + '"'
+        conn_auth_token.execute(sql_string)
+
+        conn_auth_token.commit()
+        conn_auth_token.close()
+
+    if button_command_value == "save" and session_string is not None:
+        if text_authorized_email_addresses == "":
+            print("save no lines for authorization!!")
+        else:
+            print("save authorization to db!!")
+            session_in_int = int(session_string)
+            dbname = DB_NAME_AUTH
+            conn = sqlite3.connect(dbname)
+            lines_of_text_authorized_email_addresses = [i for i in text_authorized_email_addresses.split(';') if i != ""]
+            # TODO: dupblicate check with the existing entries
+            # TODO: result message
+            df_session_setting_adding_from_email = pd.DataFrame(lines_of_text_authorized_email_addresses)
+            df_session_setting_adding_from_email.columns = ['email']
+            df_session_setting_adding_from_email['session_id_parent'] = session_in_int
+            df_session_setting_adding_from_email['owner'] = ""
+            df_session_setting_adding_from_email['connection_type'] = REL_SESSION_GRANTED_ID
+
+            df_session_setting_adding_from_email.to_sql('session_internal_mapping', conn, if_exists='append', index=False)
+            conn.commit()
+            conn.close()
+        text_authorized_email_addresses = ""
+    if text_authorized_email_addresses is not None:
+        kwargs['text_authorized_email_addresses'] = text_authorized_email_addresses
+
+    df_session_settings = None
+    if session_string is not None:
+        dbname_auth = DB_NAME_AUTH
+        conn_auth = sqlite3.connect(dbname_auth)
+
+        dbname_session = DB_NAME
+        conn_session = sqlite3.connect(dbname_session)
+
+        df_session_auth = pd.read_sql("SELECT * from session_internal_code where session_id = '" + session_string + "'", conn_session)
+        df_session_mapping = pd.read_sql("SELECT * from session_internal_mapping where session_id_parent = '" + session_string + "'", conn_auth)
+        conn_session.close()
+        conn_auth.close()
+
+        if len(df_session_auth) != 0:
+            session_in_int = int(session_string)
+            df_session_children = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+                                                     (df_session_mapping['connection_type']== REL_SESSION_CHILDREN )]
+            df_session_grant_token = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+                                                     (df_session_mapping['connection_type']== REL_SESSION_GRANT_TOKEN )]
+            df_session_grant_id = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+                                                     (df_session_mapping['connection_type']== REL_SESSION_GRANTED_ID )]
+            df_session_parent = df_session_mapping[df_session_mapping['session_id_child']== session_in_int]
+
+            kwargs["df_list"] = df_session_grant_id
+            kwargs["df_list_token"] = df_session_grant_token
+
+            if (text_authorized_names == "") | (text_authorized_names is None):
+                if len(df_session_grant_id) != 0:
+                    df_session_grant_id_onwer = df_session_grant_id[(df_session_grant_id['owner'] != "" ) & ~(df_session_grant_id['owner'].isna())]
+                    if len(df_session_grant_id_onwer) != 0:
+                        kwargs['text_authorized_names'] = ";".join(df_session_grant_id_onwer['owner'])
+            else:
+                kwargs['text_authorized_names'] = text_authorized_names
+            # if (text_authorized_email_addresses == "") | (text_authorized_email_addresses is None):
+            #     if len(df_session_grant_id) != 0:
+            #         df_session_grant_id_email = df_session_grant_id[(df_session_grant_id['email'] != "" )]
+            #         if len(df_session_grant_id_email) != 0:
+            #             kwargs['text_authorized_email_addresses'] = ";".join(df_session_grant_id_email['email'])
+            # else:
+            #     kwargs['text_authorized_email_addresses'] = text_authorized_email_addresses
+            if (session_string_str == "") | (session_string_str is None):
+                kwargs['session_id'] = ext_session_name
+
+    text = render_template('personalize_session_authorization.html', **kwargs)
+    return text
+
+
+
+
+def personalize_session_accept_authorization(email_part:str="",userid:str=""):
+
+    df_session_internal_codelist = list_session_subscribing_only(google_userid="", email=email_part)
+
+    kwargs = {}
+    for a in request.form.keys():
+        kwargs[a] =request.form.get(a)
+
+    if request.method == "GET":
+        session_string = request.args.get('session')
+        kwargs['internal_session_id'] = session_string
+    if df_session_internal_codelist is not None:
+        df_session_internal_codelist['owner'] = df_session_internal_codelist['owner'].str[:3] + '(hidden)' + df_session_internal_codelist['owner'].str[-3:]
+
+    # button_command_value = request.form.get("command",None)
+    # if button_command_value == "speava_generate_token"  and session_string is not None:
+    #     session_in_int = int(session_string)
+    #     urlsafe_token = secrets.token_urlsafe(32)
+    #     print("token is requested",urlsafe_token)
+    #     conn = sqlite3.connect(DB_NAME_AUTH)
+    #     df_session_auth_token = pd.DataFrame([urlsafe_token])
+    #     df_session_auth_token.columns = ['token']
+    #     df_session_auth_token['session_id_parent'] = session_in_int
+    #     df_session_auth_token['connection_type'] = REL_SESSION_GRANT_TOKEN
+    #
+    #     df_session_auth_token.to_sql('session_internal_mapping', conn, if_exists='append', index=False)
+    #     conn.commit()
+    #     conn.close()
+    #
+    button_accept_command_value = request.form.get("accept_command",None)
+    if button_accept_command_value is not None:
+        value_pair = parse_qs(button_accept_command_value)
+        value_id = value_pair['id'][0]
+        email = mask_email_address(email_part)
+        conn_auth_email = sqlite3.connect( DB_NAME_AUTH)
+        sql_string = 'UPDATE session_internal_mapping set owner = "' + userid + '", email = "'+ email + '" where id = "' + value_id + '"'
+        conn_auth_email.execute(sql_string)
+
+        conn_auth_email.commit()
+        conn_auth_email.close()
+        df_session_internal_codelist = df_session_internal_codelist[~(df_session_internal_codelist['id'] == int(value_id))]
+
+    # button_remove_token_command_value = request.form.get("remove_token_command",None)
+    # if button_remove_token_command_value is not None:
+    #     remove_token_pair = parse_qs(button_remove_token_command_value)
+    #     remove_token_session = remove_token_pair['session'][0]
+    #     remove_token_id = remove_token_pair['id'][0]
+    #
+    #     conn_auth_token = sqlite3.connect( DB_NAME_AUTH)
+    #     sql_string = 'DELETE FROM session_internal_mapping where session_id_parent = "' + remove_token_session + '"' + \
+    #                  ' and id = "' + remove_token_id + '"'
+    #     conn_auth_token.execute(sql_string)
+    #
+    #     conn_auth_token.commit()
+    #     conn_auth_token.close()
+    #
+    # if button_command_value == "save" and session_string is not None:
+    #     if text_authorized_email_addresses == "":
+    #         print("save no lines for authorization!!")
+    #     else:
+    #         print("save authorization to db!!")
+    #         session_in_int = int(session_string)
+    #         dbname = DB_NAME_AUTH
+    #         conn = sqlite3.connect(dbname)
+    #         lines_of_text_authorized_email_addresses = [i for i in text_authorized_email_addresses.split(';') if i != ""]
+    #         # TODO: dupblicate check with the existing entries
+    #         # TODO: result message
+    #         df_session_setting_adding_from_email = pd.DataFrame(lines_of_text_authorized_email_addresses)
+    #         df_session_setting_adding_from_email.columns = ['email']
+    #         df_session_setting_adding_from_email['session_id_parent'] = session_in_int
+    #         df_session_setting_adding_from_email['connection_type'] = REL_SESSION_GRANTED_ID
+    #
+    #         df_session_setting_adding_from_email.to_sql('session_internal_mapping', conn, if_exists='append', index=False)
+    #         conn.commit()
+    #         conn.close()
+    #     text_authorized_email_addresses = ""
+    # if text_authorized_email_addresses is not None:
+    #     kwargs['text_authorized_email_addresses'] = text_authorized_email_addresses
+    #
+    # df_session_settings = None
+    # if session_string is not None:
+    #     dbname_auth = DB_NAME_AUTH
+    #     conn_auth = sqlite3.connect(dbname_auth)
+    #
+    #     dbname_session = DB_NAME
+    #     conn_session = sqlite3.connect(dbname_session)
+    #
+    #     df_session_auth = pd.read_sql("SELECT * from session_internal_code where session_id = '" + session_string + "'", conn_session)
+    #     df_session_mapping = pd.read_sql("SELECT * from session_internal_mapping where session_id_parent = '" + session_string + "'", conn_auth)
+    #     conn_session.close()
+    #     conn_auth.close()
+    #
+    #     if len(df_session_auth) != 0:
+    #         session_in_int = int(session_string)
+    #         df_session_children = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+    #                                                  (df_session_mapping['connection_type']== REL_SESSION_CHILDREN )]
+    #         df_session_grant_token = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+    #                                                  (df_session_mapping['connection_type']== REL_SESSION_GRANT_TOKEN )]
+    #         df_session_grant_id = df_session_mapping[(df_session_mapping['session_id_parent']== session_in_int) &
+    #                                                  (df_session_mapping['connection_type']== REL_SESSION_GRANTED_ID )]
+    #         df_session_parent = df_session_mapping[df_session_mapping['session_id_child']== session_in_int]
+    #
+    #         kwargs["df_list"] = df_session_grant_id
+    #         kwargs["df_list_token"] = df_session_grant_token
+    #
+    #         if (text_authorized_names == "") | (text_authorized_names is None):
+    #             if len(df_session_grant_id) != 0:
+    #                 df_session_grant_id_onwer = df_session_grant_id[(df_session_grant_id['owner'] != "" ) & ~(df_session_grant_id['owner'].isna())]
+    #                 if len(df_session_grant_id_onwer) != 0:
+    #                     kwargs['text_authorized_names'] = ";".join(df_session_grant_id_onwer['owner'])
+    #         else:
+    #             kwargs['text_authorized_names'] = text_authorized_names
+    #         # if (text_authorized_email_addresses == "") | (text_authorized_email_addresses is None):
+    #         #     if len(df_session_grant_id) != 0:
+    #         #         df_session_grant_id_email = df_session_grant_id[(df_session_grant_id['email'] != "" )]
+    #         #         if len(df_session_grant_id_email) != 0:
+    #         #             kwargs['text_authorized_email_addresses'] = ";".join(df_session_grant_id_email['email'])
+    #         # else:
+    #         #     kwargs['text_authorized_email_addresses'] = text_authorized_email_addresses
+    #         if (session_string_str == "") | (session_string_str is None):
+    #             kwargs['session_id'] = ext_session_name
+    #
+    kwargs['df_list'] = df_session_internal_codelist
+    text = render_template('personalize_session_accept_authorization.html', **kwargs)
+    return text
+
+def personalize_calling_function(email_part: str = "", userid: str = ""):
+
+        kwargs = {}
+        for a in request.form.keys():
+            kwargs[a] = request.form.get(a)
+
+        id_list = []
+        area_list = []
+        function_list = []
+        if request.form.getlist('id') is not None:
+            id_list = request.form.getlist('id')
+        if request.form.getlist('area') is not None:
+            area_list = request.form.getlist('area')
+        if request.form.getlist('function') is not None:
+            function_list = request.form.getlist('function')
+        if request.form.getlist('start') is not None:
+            from_list = request.form.getlist('start')
+        if request.form.getlist('end') is not None:
+            to_list = request.form.getlist('end')
+
+        df_in = pd.concat([pd.DataFrame(id_list),pd.DataFrame(area_list),pd.DataFrame(function_list),
+                           pd.DataFrame(from_list),pd.DataFrame(to_list)],axis=1)
+
+        button_update_command_value = request.form.get("command", None)
+        if button_update_command_value is not None and button_update_command_value == "save":
+            df_in_with_owner = df_in
+            df_in_with_owner.columns = ['id', 'area', 'function','start','end']
+            df_in_with_owner['owner'] = userid
+            df_in_with_id = df_in_with_owner[df_in_with_owner['id'] != ''].copy()
+            df_in_without_id = df_in_with_owner[df_in_with_owner['id'] == ''].copy()
+            if df_in_without_id is not None:
+                df_in_without_id.drop('id',axis=1,inplace=True)
+            conn_function = sqlite3.connect(DB_NAME_AUTH)
+            df_in_without_id.to_sql('calling_function', conn_function, if_exists='append', index=False)
+            for index, update_line in df_in_with_id.iterrows():
+                try:
+                    sql_string = 'UPDATE calling_function ' \
+                                 'set start = "' + str(update_line['start']) + '",' + \
+                                 ' end = "' + str(update_line['end']) + \
+                                 '" where id = "' + str(update_line['id']) + '"'
+                    conn_function.execute(sql_string)
+                except sqlite3.Warning as e:
+                    print("sqllite3.Warning")
+                    print(e)
+                    pass
+                except Exception as e:
+                    print(e)
+                    pass
+
+            conn_function.commit()
+            conn_function.close()
+
+        dbname = DB_NAME_AUTH
+        conn = sqlite3.connect(dbname)
+
+        df_functions_db = pd.read_sql("SELECT * from calling_function where owner = '" + userid + "'", conn)
+        conn.close()
+
+        df_functions = pd.DataFrame(allowed_function_list)
+        df_functions.columns = ['function']
+        df_functions_area1 = pd.DataFrame(df_functions.copy())
+        df_functions_area1['area'] = 'show'
+        df_functions_area2 = pd.DataFrame(df_functions.copy())
+        df_functions_area2['area'] = 'notification'
+        df_calling_function_template = pd.concat([df_functions_area1, df_functions_area2], axis=0)
+
+        if len(df_functions_db) == 0:
+            df_calling_function_final = df_calling_function_template
+        else:
+            df_calling_function_final = pd.merge(df_calling_function_template,df_functions_db , on=['area','function'], how="outer")
+            df_calling_function_final.loc[pd.isna(df_calling_function_final['id']),'id'] = ""
+        kwargs["df_list"] = df_calling_function_final
+        text = render_template('personalize_calling_function.html', **kwargs)
+        return text
+
 # @app.route('/personalize_session', methods=['POST', 'GET'])
 def personalize_for_session_vocab(session_string:str="",email_part:str=""):
 
@@ -502,6 +843,50 @@ def personalize_for_session_vocab(session_string:str="",email_part:str=""):
         conn.close()
 
     return text
+def grant_token_for_session(token_string:str = "", email_part:str = "", userid: str=""):
+
+    # look up token
+    # if available, grant access (add entry in allowed user list)
+    df_session_settings = None
+
+    dbname_auth = DB_NAME_AUTH
+    conn_auth = sqlite3.connect(dbname_auth)
+
+    df_session_mapping = pd.read_sql("SELECT * from session_internal_mapping where token = '" + token_string + "'", conn_auth)
+    conn_auth.close()
+
+    if len(df_session_mapping) == 0:
+        return "Session with the token is missing."
+
+
+    session_in_int = df_session_mapping['session_id_parent'].values[0]
+    session_str = str(session_in_int)
+
+    conn_session = sqlite3.connect(dbname_auth)
+
+    df_session_auth = pd.read_sql("SELECT * from session_internal_mapping where session_id_parent = '" + session_str + "'" +
+                                  " and " +
+                                  "connection_type = '" + REL_SESSION_GRANTED_ID + "'"
+                                  , conn_session)
+    conn_session.close()
+    if userid in df_session_auth['owner'].values:
+        return "authorization already given"
+
+    df_insert = pd.DataFrame(columns=['session_id_parent','connection_type','email','owner'])
+    tmp_se = pd.Series([
+            session_str,
+            REL_SESSION_GRANTED_ID,
+            email_part,
+            userid
+    ], index=df_insert.columns)
+    df_insert = df_insert.append(tmp_se, ignore_index=True)
+
+    conn_session_authorization = sqlite3.connect(dbname_auth)
+    df_insert.to_sql('session_internal_mapping',conn_session_authorization,if_exists='append', index=False)
+    conn_session_authorization.close()
+
+
+    return "authorization given to " + email_part
 
 if __name__ == "__main__":
 

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Configure calling function</title>
+</head>
+<body>
+<a href="/">Show start page</a>
+<form action="/personalize_calling_function" method="POST" enctype="multipart/form-data">
+<div>
+    <table>
+    <tr><td colspan="4"><b>List of calling functions</b></td></tr>
+{% if (df_list is none): %}
+    <tr>
+        <td>No display area configurations are retrieved</td>
+        <td></td>
+    </tr>
+{% elif (df_list|length == 0): %}
+    <tr>
+        <td>No display area configurations are found</td>
+        <td></td>
+    </tr>
+    {% else %}
+    <tr>
+        <td>id</td>
+        <td>area</td>
+        <td>function</td>
+        <td>start</td>
+        <td>end</td>
+    </tr>
+
+    {% for index, item in df_list.iterrows(): %}
+    <tr>
+        <td><input type="text" id="id" name="id" value="{{item['id']}}" readonly="readonly"></td>
+        <td><input type="text" id="area" name="area" value="{{item['area']}}" readonly="readonly"></td>
+        <td><input type="text" id="function" name="function" value="{{item['function']}}" readonly="readonly"></td>
+        <td><input type="text" id="start" name="start" value="{{item['start']}}"></td>
+        <td><input type="text" id="end" name="end" value="{{item['end']}}"></td>
+    </tr>
+{% endfor %}
+    {% endif %}
+
+</table>
+</div>
+    <button id="save" name="command" value="save">Save</button>
+	<input type="submit" value="Search">
+</form>
+
+
+    <style>
+        div.textarea {
+   height: 48px;
+   width: 100%;
+}
+        textarea {
+   position: relative;
+   height: 48px;
+   width: 100%;
+   transition: all 500ms;
+}
+        textarea:focus {
+   z-index: 1001;
+   min-height:250px;
+}
+    </style>
+
+<!--<script src="options.js"></script>-->
+</body>
+</html>
