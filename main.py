@@ -1177,6 +1177,14 @@ def return_notification():
                                            google_userid = userinfo_id,google_part_of_email = useremail)
     if data is None or data == "":
         print("no data to return")
+        data_show = {"notification": {"text": f"Failed to process. Session {session_string} is not available. Select another session"},
+                     "heading": "No data",
+                     "setting":
+                         {"duration": 5000}
+                     }
+        data_return = jsonify(data_show)
+        return data_return
+
     return data
 
 @app.route('/show',methods=['POST','GET'])
