@@ -49,6 +49,7 @@ td {
     <tr>
         <td>id</td>
         <td>Session name</td>
+        <td>Show without extension</td>
         <td>Show full info</a></td>
         <td>Add/remove authorized users</a></td>
         <td>Show runtime captioning</td>
@@ -61,6 +62,7 @@ td {
     <tr>
         <td>{{item['session_id']}}</td>
         <td>{{item['external_session_name']}}</td>
+        <td><a href="/run_on_server?session={{item['session_id']}}">full info</a></td>
         <td><a href="/render_in_full?session={{item['session_id']}}">full info</a></td>
         <td><a href="/personalize_session_authorization?session={{item['session_id']}}">Change</a></td>
         <td><a href="/caption?session={{item['session_id']}}">runtime captioning</a></td>

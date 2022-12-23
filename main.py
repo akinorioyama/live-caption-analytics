@@ -127,8 +127,12 @@ def return_prompt_options():
     session_id = None
     # check every n min.
     if (google_access_token == ""):
-        data = [{'not_authenticated': True}]
-        return jsonify(data)
+        if ('credentials' in flask_session):
+            if ('token' in flask_session['credentials']):
+                google_access_token = flask_session['credentials']['token']
+        else:
+            data = [{'not_authenticated': True}]
+            return jsonify(data)
 
     if (google_access_token != ""):
         userinfo_id, useremail = get_authentication_session_settings(username="",
@@ -1085,12 +1089,16 @@ def return_notification():
     session_id = None
     # check every n min.
     if (google_access_token == ""):
-        data_show = {"notification": {"text":"Login to Google to start. Press 個 button to start authentication."},
-                 "heading": "no data",
-                 "setting":
-                     {"duration": 2000}
-                 }
-        return jsonify( data_show)
+        if ('credentials' in flask_session):
+            if ('token' in flask_session['credentials']):
+                google_access_token = flask_session['credentials']['token']
+        else:
+            data_show = {"notification": {"text":"Login to Google to start. Press 個 button to start authentication."},
+                     "heading": "no data",
+                     "setting":
+                         {"duration": 2000}
+                     }
+            return jsonify( data_show)
 
     if (google_access_token != ""):
         userinfo_id, useremail = get_authentication_session_settings(username="",
@@ -1207,21 +1215,26 @@ def return_stat_result():
     google_access_token = data_json['google_access_token']
 
     if google_access_token == "":
-        data_show = {"notification": {"text": "Login to Google to start. Press 個 button to start authentication."},
-                     "heading": "no data",
-                     "setting":
-                         {"duration": 2000}
-                     }
-        return jsonify(data_show)
+        if ('credentials' in flask_session):
+            if ('token' in flask_session['credentials']):
+                google_access_token = flask_session['credentials']['token']
+        else:
+            data_show = {"notification": {"text": "Login to Google to start. Press 個 button to start authentication."},
+                         "heading": "no data",
+                         "setting":
+                             {"duration": 2000}
+                         }
+            return jsonify(data_show)
 
     userinfo_id = None
     useremail = None
     session_id = None
-    userinfo_id, useremail = get_authentication_session_settings(username="",
-                                                                 authorization_token=google_access_token)
-    session_id = get_sessionid(session_string=session_string, owner=userinfo_id)
-    # session_string = session_string,
-    # userinfo_id = get_user_id(google_access_token)
+    if (google_access_token != ""):
+        userinfo_id, useremail = get_authentication_session_settings(username="",
+                                                                     authorization_token=google_access_token)
+        session_id = get_sessionid(session_string=session_string, owner=userinfo_id)
+        # session_string = session_string,
+        # userinfo_id = get_user_id(google_access_token)
     if session_id is None:
         data_show = {"notification": {"text": f"Session {session_string} is not available. Select another session"},
                      "heading": "No data",
@@ -2615,6 +2628,35 @@ def return_session_template_to_test():
 @app.route('/lca_status/sample_session_copy',methods=['POST','GET'])
 def return_session_copy():
     text = render_template('show_session_copy.html')
+    return text
+
+@app.route('/run_on_server',methods=['POST','GET'])
+def return_run_on_server():
+    userid = None
+    given_name = None
+    email = None
+    session_name = None
+    if request.method == 'GET':
+        received_session_id = request.args.get('session')
+        try:
+            dbname = DB_NAME
+            conn = sqlite3.connect(dbname)
+            where_clause_string = ""
+            df_session_internal_codelist = pd.read_sql("SELECT * from session_internal_code where"
+                                                                    " session_id = '" + received_session_id + "'"
+                                                                    , conn)
+            conn.close()
+            if len(df_session_internal_codelist) != 0:
+                session_name = df_session_internal_codelist['external_session_name'].values[0]
+        except Exception as e:
+            print(e)
+
+    userid, given_name, email, __ = get_browser_session_authentication()
+    userid = str(userid)[:3] +  "(hidden)" + str(userid)[-3:]
+    kwargs = {"userid" : userid, "given_name" : given_name, "email": email,
+              'session_id':session_name}
+
+    text = render_template('run_on_server.html', **kwargs)
     return text
 
 
