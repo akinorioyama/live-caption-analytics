@@ -32,7 +32,10 @@ try {
   // let currentSpeakerIndex = null;
 
   let speava_session_id = "";
-
+  let speava_access_token_openid = "";
+  let speava_access_token_validuntil = null;
+  let isLoggedIn = false;
+  let token_expire_interval = null;
   // -------------------------------------------------------------------------
   // CACHE is an array of speakers and comments
   //
@@ -105,7 +108,7 @@ try {
   let speava_session_prompt;
   let speava_session_option_string;
   let speava_session_text_color;
-
+  const ID_TOGGLE_BUTTON_LOGIN = '__lca-login-icon';
   const hostname_for_adhoc = document.location.hostname;
 
   let SpeechRecognition;
@@ -288,6 +291,17 @@ try {
   // -------------------------------------------------------------------------
   // sync settings from localStorage
   // -------------------------------------------------------------------------
+  const get_Localstorate_Item = (item_string) => {
+    const localstorage_temp = localStorage.getItem(item_string);
+    let str_in_lower_case = "";
+    if (localstorage_temp!==null){
+      str_in_lower_case = localstorage_temp.toLowerCase();
+      const parsed_item = JSON.parse(str_in_lower_case);
+      return parsed_item;
+    } else {
+      return null;
+    }
+  }
   const getAllStorageSyncData = () => {
     // Immediately return a promise and start asynchronous work
 
@@ -296,12 +310,20 @@ try {
     speava_session_spreadsheet_post = localStorage.getItem('speava_session_spreadsheet_post');
     speava_session_username = localStorage.getItem('speava_session_username');
     speava_session_log_string = localStorage.getItem('speava_session_log_string');
-    speava_session_send_rawed = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
-    speava_session_post = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
-    speava_session_show = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
-    speava_session_notification = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
-    speava_session_unrecognized = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
-    speava_session_prompt = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
+    if (speava_session_log_string===null){
+      speava_session_log_string = 'Wonder,Mistakes';
+    }
+    // speava_session_send_rawed = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
+    speava_session_post = get_Localstorate_Item('speava_session_post');
+    speava_session_show = get_Localstorate_Item('speava_session_show');
+    speava_session_notification = get_Localstorate_Item('speava_session_notification');
+    speava_session_unrecognized = get_Localstorate_Item('speava_session_unrecognized');
+    speava_session_prompt = get_Localstorate_Item('speava_session_prompt');
+    // speava_session_post = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
+    // speava_session_show = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
+    // speava_session_notification = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
+    // speava_session_unrecognized = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
+    // speava_session_prompt = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
     speava_session_option_string = localStorage.getItem('speava_session_option_string');
     speava_session_id = localStorage.getItem('speava_session_id');
     speava_session_text_color = localStorage.getItem('speava_session_text_color');
@@ -378,7 +400,7 @@ try {
       speava_server_username = items.speava_session_username;
       speava_session_log_string = items.speava_session_log_string;
       speava_session_send_raw =             items.speava_session_send_raw
-      speava_session_post =                 items.speava_session_post  
+      speava_session_post =                 items.speava_session_post
       speava_session_show =                 items.speava_session_show
       speava_session_notification =         items.speava_session_notification
       speava_session_unrecognized =         items.speava_session_unrecognized
@@ -1486,12 +1508,18 @@ try {
               document.getElementById('speava_session_spreadsheet_post').value = localStorage.getItem('speava_session_spreadsheet_post');
               document.getElementById('speava_session_username').value = localStorage.getItem('speava_session_username');
               document.getElementById('speava_session_log_string').value = localStorage.getItem('speava_session_log_string');
-              document.getElementById('speava_session_send_raw').checked = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
-              document.getElementById('speava_session_post').checked = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
-              document.getElementById('speava_session_show').checked = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
-              document.getElementById('speava_session_notification_option').checked = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
-              document.getElementById('speava_session_unrecognized').checked = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
-              document.getElementById('speava_session_prompt').checked = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
+              // document.getElementById('speava_session_send_raw').checked = JSON.parse(localStorage.getItem('speava_session_send_raw').toLowerCase());
+              // document.getElementById('speava_session_post').checked = JSON.parse(localStorage.getItem('speava_session_post').toLowerCase());
+              // document.getElementById('speava_session_show').checked = JSON.parse(localStorage.getItem('speava_session_show').toLowerCase());
+              // document.getElementById('speava_session_notification_option').checked = JSON.parse(localStorage.getItem('speava_session_notification').toLowerCase());
+              // document.getElementById('speava_session_unrecognized').checked = JSON.parse(localStorage.getItem('speava_session_unrecognized').toLowerCase());
+              // document.getElementById('speava_session_prompt').checked = JSON.parse(localStorage.getItem('speava_session_prompt').toLowerCase());
+              document.getElementById('speava_session_send_raw').checked = get_Localstorate_Item('speava_session_send_raw');
+              document.getElementById('speava_session_post').checked = get_Localstorate_Item('speava_session_post');
+              document.getElementById('speava_session_show').checked = get_Localstorate_Item('speava_session_show');
+              document.getElementById('speava_session_notification_option').checked = get_Localstorate_Item('speava_session_notification');
+              document.getElementById('speava_session_unrecognized').checked = get_Localstorate_Item('speava_session_unrecognized');
+              document.getElementById('speava_session_prompt').checked = get_Localstorate_Item('speava_session_prompt');
               document.getElementById('speava_session_option_string').value = localStorage.getItem('speava_session_option_string');
               document.getElementById('speava_session_text_color').value = localStorage.getItem('speava_session_text_color');
             // });
@@ -1890,6 +1918,21 @@ try {
       buttons.style.position = 'absolute';
       objBody_buttons.appendChild(buttons);
 
+      const login_text = document.createElement('div');
+      login_text.style.display = 'flex';
+      login_text.style.position = 'relative';
+      login_text.style.float = 'left';
+      login_text.id = "speava_valid_thru";
+      login_text.style.font.fontcolor(speava_session_text_color);
+      buttons.prepend(login_text);
+
+      const toggleButton_login = document.createElement('div');
+      toggleButton_login.style.display = 'flex';
+      toggleButton_login.style.position = 'relative';
+      toggleButton_login.style.float = 'left';
+      toggleButton_login.onclick = tryTo(toggleLogin, 'toggling grid login');
+      buttons.prepend(toggleButton_login);
+
       const toggleButton = document.createElement('div');
       toggleButton.style.display = 'flex';
       toggleButton.style.position = 'relative';
@@ -1903,6 +1946,7 @@ try {
       const url_icon_delete = chrome_runtime_getURL("icons/icon_delete.png");
       const url_icon_record = chrome_runtime_getURL("icons/icon_record.png");
       const url_icon_log = chrome_runtime_getURL("icons/icon_log.png");
+      const url_icon_login = chrome_runtime_getURL("icons/icon_login.png");
 
       const reactionFocus_log_action = () => log_action(currentTranscriptId);
       const open_options = () => open_option_dialog();
@@ -1930,6 +1974,13 @@ try {
         path: url_icon_log,
       };
 
+      const _PNG_LOGIN = {
+        viewBoxWidth: 512,
+        viewBoxHeight: 512,
+        path: url_icon_login,
+      };
+
+      toggleButton_login.appendChild(makePng(_PNG_LOGIN, 36, 36, { id: ID_TOGGLE_BUTTON_LOGIN }));
       toggleButton.appendChild(makePng(_PNG_RECORD, 36, 36, { id: ID_TOGGLE_BUTTON }));
 
       const deleteButton = document.createElement('div');
@@ -2067,6 +2118,16 @@ try {
         return;
       }
     }
+    if (speava_access_token_openid==="") {
+      document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.remove('on');
+      document.getElementById("speava_valid_thru").innerText = "Not authenticated";
+    } else {
+      document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+      let auth_valid_until = new Date(speava_access_token_validuntil);
+      let auth_valid_text ;
+      auth_valid_text = String(auth_valid_until.getMinutes()) + ":" + String(auth_valid_until.getSeconds())
+      document.getElementById("speava_valid_thru").innerText = "Authenticated until " + auth_valid_text ;
+    }
 
   };
 
@@ -2111,6 +2172,243 @@ try {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // login with Google account (within service)
+  // -------------------------------------------------------------------------
+  var GoogleAuth;
+  var SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly';
+  function handleClientLoad() {
+    // Load the API's client and auth2 modules.
+    // Call the initClient function after the modules load.
+    gapi.load('client:auth2', initClient);
+  }
+
+  function initClient() {
+    // In practice, your app can retrieve one or more discovery documents.
+    var discoveryUrl = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+
+    // Initialize the gapi.client object, which app uses to make API requests.
+    // Get API key and client ID from API Console.
+    // 'scope' field specifies space-delimited list of access scopes.
+    gapi.client.init({
+        'apiKey': 'YOUR_API_KEY',
+        'clientId': 'YOUR_CLIENT_ID',
+        'discoveryDocs': [discoveryUrl],
+        'scope': SCOPE
+    }).then(function () {
+      GoogleAuth = gapi.auth2.getAuthInstance();
+
+      // Listen for sign-in state changes.
+      GoogleAuth.isSignedIn.listen(updateSigninStatus);
+
+      // Handle initial sign-in state. (Determine if user is already signed in.)
+      var user = GoogleAuth.currentUser.get();
+      setSigninStatus();
+
+      // Call handleAuthClick function when user clicks on
+      //      "Sign In/Authorize" button.
+      $('#sign-in-or-out-button').click(function() {
+        handleAuthClick();
+      });
+      $('#revoke-access-button').click(function() {
+        revokeAccess();
+      });
+    });
+  }
+
+  function handleAuthClick() {
+    if (GoogleAuth.isSignedIn.get()) {
+      // User is authorized and has clicked "Sign out" button.
+      GoogleAuth.signOut();
+    } else {
+      // User is not signed in. Start Google auth flow.
+      GoogleAuth.signIn();
+    }
+  }
+
+  function revokeAccess() {
+    GoogleAuth.disconnect();
+  }
+
+  function setSigninStatus() {
+    var user = GoogleAuth.currentUser.get();
+    var isAuthorized = user.hasGrantedScopes(SCOPE);
+    if (isAuthorized) {
+      $('#sign-in-or-out-button').html('Sign out');
+      $('#revoke-access-button').css('display', 'inline-block');
+      $('#auth-status').html('You are currently signed in and have granted ' +
+          'access to this app.');
+    } else {
+      $('#sign-in-or-out-button').html('Sign In/Authorize');
+      $('#revoke-access-button').css('display', 'none');
+      $('#auth-status').html('You have not authorized this app or you are ' +
+          'signed out.');
+    }
+  }
+
+  function updateSigninStatus() {
+    setSigninStatus();
+  }
+  function create_oauth() {
+    const CLIENT_ID = "842081461784-6gpvga9opdn9cum6m5h7sa950gbl21hb.apps.googleusercontent.com";
+    const REDIRECT_URI = "https://localhost:443/oauth2callback";
+    let auth_url = `https://accounts.google.com/o/oauth2/v2/auth?`
+
+    var auth_params = {
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    response_type: 'token',
+    scope: "https://www.googleapis.com/auth/userinfo.email openid",
+
+    };
+    const url = new URLSearchParams(Object.entries(auth_params));
+    url.toString();
+    auth_url += url;
+
+    return auth_url;
+  }
+
+  // -------------------------------------------------------------------------
+  // login with Google account
+  // -------------------------------------------------------------------------
+  const toggleLogin = () => {
+    // make it tri-state. On / about to expire / off
+    isLoggedIn ? stopLogin() : startLogin()
+  }
+
+  const open_auth_dialog = (message_type) => {
+
+    if (message_type === "clear"){
+      speava_access_token_openid = "";
+      speava_access_token_validuntil = null;
+    }
+    handleClientLoad();
+    chrome.launchWebAuthFlow({
+        url: create_oauth(),
+        interactive: true,
+    }, function (redirect_uri) {
+      let rep_str = redirect_uri.replace("#access_token", "?access_token");
+      let url = new URL(rep_str);
+    });
+
+    chrome.runtime.sendMessage({ message: message_type }, (response) =>  {
+        console.log('got the response'); //this log is never written
+        if (response.message === 'success'){
+            console.log(response.access_token);
+            speava_access_token_openid = response.access_token;
+            speava_access_token_validuntil = response.valid_through;
+            if (speava_access_token_openid!=="") {
+              token_expire_interval = setInterval(tryTo(login_expiration_loop, 'attach to captions'), 10000);
+              document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+              isLoggedIn = true;
+            } else {
+              toast_to_notify("authentication stopped or failed.",5000);
+              isLoggedIn = false;
+            }
+        }
+    });
+  }
+
+  const stopLogin = () => {
+    // clearInterval(closedCaptionsAttachInterval)
+    clearInterval(token_expire_interval);
+    toast_to_notify("Clear authenticated data",5000);
+    open_auth_dialog("clear");
+    document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.remove('on');
+  }
+
+  const startLogin = () => {
+    // token_expire_interval = setInterval(tryTo(login_expiration_loop, 'attach to captions'), 1000);
+    toast_to_notify("authenticate yourself",5000);
+    open_auth_dialog("login");
+    // if (speava_access_token_openid!=="") {
+    //   document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.add('on');
+    // } else {
+    //   toast_to_notify("authentication stopped or failed.",5000);
+    // }
+  }
+
+  const login_expiration_loop = () => {
+    let renewal_check_date = new Date();
+    if (speava_access_token_validuntil === null){
+      return;
+    }
+    if  ( new Date(speava_access_token_validuntil) <= new Date() ) {
+      toast_to_notify("Authenticated data expired.",5000);
+      open_auth_dialog("clear");
+      isLoggedIn = false;
+      return;
+    }
+
+    // pre-warn period to prompt to re-authenticate
+    renewal_check_date.setSeconds(renewal_check_date.getSeconds() + 180);
+    if ( new Date(speava_access_token_validuntil) <= renewal_check_date ) {
+      const json_options_auth = {
+        heading: "Authenticatation is about to expire. Authenticate yourself",
+        prompt_options: "Yes",
+        setting: {duration:2500}
+      }
+      PromptGeneric(json_options_auth);
+    }
+  }
+
+  const PromptGeneric = (json_text) => {
+    return new Promise((resolve, reject) => {
+      let dialog = document.createElement('dialog');
+      let counter = 0;
+      let inner_text = "";
+      let heading = json_text.heading;
+      let prompt_text = json_text.prompt_options;
+      const time_length = json_text.setting.duration;
+      dialog.id = "prompt_generic_dialog"
+      inner_text = `<form>`;
+      inner_text += `<div style="display:inline; font-size:48px;">${heading}<br></div>`
+      item_texts = prompt_text.split(",");
+      for (let item_text of item_texts) {
+        inner_text += `<div id="prompttext${counter}" style="display:inline; font-size:48px;">${item_text} </div>`
+        counter += 1;
+      }
+      inner_text += `         
+              <input type="text" hidden="true">
+              <button type="submit" hidden="true">Ok</button>
+          </form>
+      `;
+      dialog.innerHTML = inner_text;
+      document.body.appendChild(dialog);
+      dialog.oncancel = function(){
+        dialog.remove();
+      }
+      dialog.showModal();
+      if (prompt_text.length === 0) {
+        setTimeout( function() {dialog.remove();}, 1000);
+      } else {
+        setTimeout( function() {dialog.remove();}, time_length);
+        // setTimeout( function() {
+        //   const message_text = chrome.i18n.getMessage("prompt_no_answer");
+        //   if_dialog_exist = document.getElementById('prompt_generic_dialog');
+        //   if (if_dialog_exist){
+        //     toast_to_notify('<div style="font-size:24px;">' +
+        //         message_text +
+        //         '</div>',2500);
+        //   }
+        //   dialog.remove();
+        //   }, time_length);
+      }
+      for (let new_counter = 0; new_counter < counter ;new_counter++) {
+        document.getElementById(`prompttext${new_counter}`).addEventListener('click', e => {
+          if (e.target.innerText === "Yes"){
+            open_auth_dialog("clear");
+            isLoggedIn = false;
+            open_auth_dialog("login");
+          }
+          document.getElementById('prompt_generic_dialog').remove();
+        });
+      }
+    });
+  }
+
+
+
   ////////////////////////////////////////////////////////////////////////////
   // Main App
   ////////////////////////////////////////////////////////////////////////////
@@ -2134,7 +2432,7 @@ try {
 
   // Add stylesheet to DOM
   // const STYLE = document.createElement('style')
-  // const url_icon_circle = chrome_runtime_getURL("icons/icon_circle.png");
+  const url_icon_circle = chrome_runtime_getURL("icons/icon_circle.png");
   // STYLE.innerText = `#__gmla-icon.on { background-image: url("${url_icon_circle}");
   //                                     background-size: 36px;
   //                                     opacity: 0.5;
@@ -2142,6 +2440,15 @@ try {
   //                                     width:36px;
   //                                     height:36px;}  `
   // document.head.append(STYLE);
+  const STYLE_LOGIN_ICON = document.createElement('style')
+  STYLE_LOGIN_ICON.innerText = `#__lca-login-icon.on { background-image: url("${url_icon_circle}");
+                                      background-size: 36px;
+                                      opacity: 0.5;
+                                      z-index: 99;
+                                      width:36px;
+                                      height:36px;}  `
+  document.head.append(STYLE_LOGIN_ICON);
+
 })();
 
 } catch (e) {

@@ -62,7 +62,7 @@
         }
     },
     "prompt_during_edit": {
-        "message" : "Drag areas to move color-filled areas. Click the setting icon again to freeze the adjusted positions. Hold down control key to change the right edge and the bottom edge."
+        "message" : "Drag areas to move color-filled areas. Click the setting icon again to freeze the adjusted positions. Hold down control key to change the right edge and the bottom edge.<br>Disable Show unrecognize word option. Otherwise, the section is locked and you can't move"
     },
     "oauth_not_authenticated":{
         "message" : "Not authenticated"

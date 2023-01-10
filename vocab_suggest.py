@@ -10,7 +10,13 @@ import requests
 import json
 import datetime
 import configparser
-
+import language_tool_python
+import re
+tool = language_tool_python.LanguageTool('en-US')
+list_not_shown = ['PUNCTUATION',
+                  'TYPOS',
+                  'CASING',
+                  'TYPOGRAPHY']
 config = configparser.ConfigParser()
 config.read('../lca_config.ini', encoding='utf8')
 key = config['connection.config.dictionary']['merriam_api']
@@ -243,9 +249,15 @@ def extract_words_from_response(list_responses = None,list_type="syn_list"):
     dt_list = []
     level_list = []
     for list_response in list_responses:
+        if ('meta' in list_response) == False:
+            continue
         response = json.loads(list_response)
         for entry_in_response in response:
             if ('meta' in entry_in_response) == False:
+                continue
+            if type(entry_in_response) != dict:
+                continue
+            if ('id' in entry_in_response['meta']) == False:
                 continue
             id = entry_in_response['meta']['id']
             if ('hwi' in entry_in_response) == False:
@@ -322,8 +334,8 @@ def suggest_words(target_level_equal_and_above = "C2",df = None, df_target_langu
         if word in df_add_to_reference['word'].values:
             list_synonym.append(df_add_to_reference[df_add_to_reference['word']==word]['response'].values[0])
         elif word in df_reference['word'].values:
-            word = word.replace("'","")
-            df_single_word_reference = pd.read_sql("SELECT * from merriam_data where word = '" + word + "'", conn)
+            # word = word.replace("'","")
+            df_single_word_reference = pd.read_sql('SELECT * from merriam_data where word = "' + word + '"', conn)
             if len(df_single_word_reference) != 0:
                 list_synonym.append(df_single_word_reference['response'].values[0])
         else:
@@ -379,6 +391,172 @@ def get_frequently_used_words(session=None,actor=None,start:datetime=None):
 def remove_stopwords_entry(df:pd.DataFrame=None):
     df = df[~df['vocab'].isin(stop_words)]
     return df
+
+def grammatical_error_all(session_string="", include_last_record=False, since_last_update=None):
+
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+    # columns = ['id', 'session', 'caption_id', 'start', 'actor', 'category', 'ruleId','ruleIssueType','text','error_message','text_correction']
+    columns_new = ['session', 'caption_id', 'start', 'actor', 'category', 'ruleId','ruleIssueType','text','error_message','text_correction']
+    columns_caption = ['id', 'session', 'start', 'end','actor', 'text','actor_ip','actor_account']
+
+    max_start = None
+    max_processed_start = None
+
+    if since_last_update == True:
+        df_grammar_max = pd.read_sql("SELECT max(start) FROM grammatical_log " + \
+                                   " where session = '" + session_string + "'", conn)
+        max_processed_start = df_grammar_max['max(start)'].values[0]
+
+    kwargs = []
+
+    df_max = pd.read_sql("SELECT max(start) FROM caption " + \
+                         " where session = '" + session_string + "'", conn)
+    max_start = df_max['max(start)'].values[0]
+
+    if session_string is not None:
+        # if session_string == "%":
+        #     kwargs.append(['session',session_string, "like"])
+        # else:
+        kwargs.append(['session', session_string, "="])
+    # TODO: potential parallel updates...
+    #  need a mehanism to exclude the latest ones where caption is still being updated
+    if include_last_record == False:
+        if max_start is not None:
+            item = ["start", max_start, "<"]
+            kwargs.append(item)
+
+    if since_last_update == True:
+        if max_processed_start is not None:
+            item = ["start", max_processed_start, ">"]
+            kwargs.append(item)
+    elif since_last_update == False:
+        if max_processed_start is not None:
+            item = ["start", max_processed_start, "<="]
+            kwargs.append(item)
+    if len(kwargs) == 0:
+        where_clause = ""
+    else:
+        where_clause = 'WHERE ' + ' AND '.join(
+            [k[0] + ' %s "%s"' % (k[2], k[1]) for k in kwargs])
+
+    print("read caption with where:", where_clause)
+    df = pd.read_sql("SELECT " + str.join(",", columns_caption) + " FROM caption " +\
+                     where_clause ,
+                     conn)
+
+    df.columns = columns_caption
+    df['start'] = pd.to_datetime(df['start'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['end'] = pd.to_datetime(df['end'], format="%Y-%m-%d %H:%M:%S.%f")
+    df['text'] = df['text'].str.lower()
+
+    if len(df) == 0:
+        return None
+     # .sort_values(['vocab', 'definition_text'], ascending=[True, True])
+
+    df_grammar_log = pd.read_sql("SELECT * FROM grammatical_log " + \
+                               " where session = '" + session_string + "'" +
+                                 " and start >= '" + max_start + "'"
+                                 , conn)
+    df_new = pd.DataFrame(columns=columns_new)
+
+
+    try:
+        l_all_entries = []
+
+        for index, caption_item in df.iterrows():
+
+            df_grammar_log_for_a_starttime = df_grammar_log[df_grammar_log['start'] == caption_item['start']]
+            # look for same start, same text
+
+            list_split_text = caption_item['text'].split(".")
+            list_split_text_period = [ i + '.' for i in list_split_text]
+            df_grammar_log['text'] = df_grammar_log['text'].str.lower()
+            # if len(df_grammar_log) != 0:
+            #     df_grammar_not_touched = df_grammar_log[~df_grammar_log['text'].isin(list_split_text_period)]
+            # else:
+            #     df_grammar_not_touched = df_grammar_log
+            # df_grammar_log_for_a_starttime
+            ## remove list_split_text_period item if one exists in df_grammar_log['text']
+            for grammar_item in list_split_text_period:
+                matches = tool.check(grammar_item)
+                # print(matches)
+
+                for item in matches:
+                    # print(item)
+                    try:
+                        if item.category in list_not_shown:
+                            continue
+                        # print(item)
+                        if len(item.replacements) != 0:
+                            replacing_string = str.join('/', item.replacements)
+                        else:
+                            replacing_string = ""
+                        print(re.sub(u"(\u2018|\u2019)", "'", item.message))
+                        print(
+                            item.context[:item.offsetInContext] +
+                            item.context[item.offsetInContext:item.offsetInContext + item.errorLength] +
+                            '<<' + item.matchedText + '>>' + item.context[item.offsetInContext + item.errorLength:]
+                        )
+
+                        error_message = re.sub(u"(\u2018|\u2019)", "'", item.message)
+                        text_correction = item.context[:item.offsetInContext] + \
+                            '<b>' + item.matchedText + '</b> to <i>[' + replacing_string + ']</i> ' + item.context[item.offsetInContext + item.errorLength:]
+
+                        # columns_new = [ 'session', 'caption_id', 'start', 'actor', 'text']
+                        tmp_se = pd.Series([
+                            session_string,
+                            caption_item['id'],
+                            caption_item['start'],
+                            caption_item['actor'],
+                            item.category,
+                            item.ruleId,
+                            item.ruleIssueType,
+                            grammar_item,
+                            error_message,
+                            text_correction
+                        ], index=df_new.columns)
+                        df_new = df_new.append(tmp_se, ignore_index=True)
+
+                    except Exception as e:
+                        print(e,item)
+    except Exception as e:
+        print(e, item)
+
+    return df_new
+
+
+def grammatical_error_df(session=None,actor=None,start:datetime=None):
+
+    kwargs = {}
+    if session is not None:
+        if session == "%":
+            kwargs['session'] = [session, "LIKE"]
+        else:
+            kwargs['session'] = [session,"="]
+    if actor is not None:
+        kwargs['actor'] = [actor,"="]
+    if start is not None:
+        kwargs['start'] = [start.strftime("%Y-%m-%d %H:%M:%S.%f"),">="]
+    if len(kwargs) == 0:
+        where_clause = ""
+    else:
+        where_clause = 'WHERE ' + ' AND '.join([k + ' %s "%s"' % (kwargs[k][1],kwargs[k][0]) for k in kwargs.keys()])
+    sql_string = \
+        'select id, session, caption_id, start,actor, category, ruleId, ruleIssueType,text, error_message, text_correction from grammatical_log ' + \
+        where_clause + \
+        ' order by caption_id desc'
+
+    print(sql_string)
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+
+    df = pd.read_sql(sql_string, conn)
+
+    conn.close()
+
+    return df
+
 
 if __name__ == "__main__":
 

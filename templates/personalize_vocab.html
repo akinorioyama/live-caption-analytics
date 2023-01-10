@@ -8,12 +8,24 @@
 <a href="/">Show start page</a>
 <div><span>email:</span><span>{{email}}</span></div>
 <form action="/personalize_session" method="POST" enctype="multipart/form-data">
+<!--<div>-->
+<!--    <span>-->
+<!--<b>Session:</b>-->
+<!--        <input style="width:70%" type="text" name="session_id" value="{{session_id}}"><br>-->
+<!--    </span>-->
+<!--</div>-->
 <div>
-    <span>
 <b>Session:</b>
-        <input style="width:70%" type="text" name="session_id" value="{{session_id}}"><br>
+        <input style="width:30%" type="text" id="session_id" name="session_id" value="{{session_id}}" readonly="readonly" onchange="clear_textareas();"><br>
     </span>
 </div>
+<div>
+    <span>
+<b>Internal session id:</b>
+        <input style="width:30%" type="text" name="internal_session_id" value="{{internal_session_id}}" onchange="clear_textareas();"><br>
+    </span>
+</div>
+
 <div>
     <span>
 <b>username:</b>

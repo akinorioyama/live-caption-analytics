@@ -655,6 +655,7 @@ try {
   }
   const stopDisplayFormat = () => {
     apply_opacity(1);
+    applyOptionStyles();
   }
   const startDisplayFormat = () => {
     apply_opacity(0.5);
@@ -2047,10 +2048,10 @@ try {
         let inner_text = "";
         if (prompt_text.length === 0) {
           const msg_text = chrome.i18n.getMessage('realtime_no_caption_to_send_to_log');
-          inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
+          inner_text = `<form><div style="display:inline; font-size:16px;">${msg_text}</div>`;
         } else {
           const msg_text = chrome.i18n.getMessage('realtime_caption_to_send_to_log');
-          inner_text = `<form><div style="display:inline; font-size:48px;">${msg_text}</div>`;
+          inner_text = `<form><div style="display:inline; font-size:16px;">${msg_text}</div>`;
         }
         for (let item of prompt_text) {
           item_texts = item[3];
@@ -2429,6 +2430,7 @@ try {
       const elem_text_caption_reaction = document.createElement('div');
       elem_text_caption_reaction.id = "speava_caption_reaction";
       elem_text_caption_reaction.style.position = 'absolute';
+      elem_text_caption_reaction.style.top = '60%';
       objBody.appendChild(elem_text_caption_reaction);
 
       const elem_text_notification = document.createElement('div');
@@ -2622,6 +2624,7 @@ try {
 
     let cc_button_path;
     const hostname = document.location.hostname;
+    let displayed_container;
     if (hostname.match("meet.google") !== null){
       cc_button_path = `//button[contains(@aria-label,"captions (c)")]`;
       const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
@@ -2629,6 +2632,7 @@ try {
         const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
         window.alert(msg_string);
       }
+      displayed_container = document.evaluate("//div[@role='dialog']",document, null, XPathResult.FIRST_ORDERED_NODE_TYPE).singleNodeValue;
     } else if (hostname.match("zoom") !== null){
       // cc_button_path = `//div[@class="join-audio-container"]`
       cc_button_path = `//div[@feature-type="newLTT"]`
@@ -2644,9 +2648,16 @@ try {
     const feedback_textarea = document.getElementById("speava_textarea");
     const element_caption_reaction = document.getElementById("speava_caption_reaction");
     if (captionsButtonAvailability){
-      notification_area.classList.remove('display_none');
-      feedback_textarea.classList.remove('display_none');
-      element_caption_reaction.classList.remove('display_none');
+      if (displayed_container===null){
+        notification_area.classList.remove('display_none');
+        feedback_textarea.classList.remove('display_none');
+        element_caption_reaction.classList.remove('display_none');
+      } else {
+        // hide pane when the user sees a popup because customer objects block interaction of the popup
+        notification_area.classList.add('display_none');
+        feedback_textarea.classList.add('display_none');
+        element_caption_reaction.classList.add('display_none');
+      }
     } else {
       notification_area.classList.add('display_none');
       feedback_textarea.classList.add('display_none');
@@ -2756,6 +2767,11 @@ try {
     let feedback_textarea_left = null;
     let feedback_textarea_width = null;
 
+
+    const windowHeight = window.innerHeight;
+    const border_margin = 0.8;
+    const bottom_cap_actual_value = windowHeight * ( 1 - border_margin);
+
     try {
       parsed_json = JSON.parse(speava_session_window_positions);
       if ('buttons.style.top' in parsed_json){
@@ -2806,30 +2822,70 @@ try {
     } catch (e) {
       console.log(`error window_positions parse:`, e);
     }
+
+    const return_capped_bottom = (in_value,default_value) => {
+      if (in_value !== null) {
+        console.log(in_value);
+        if (in_value == "") {
+          return default_value;
+        }
+        const parsed_value = parseFloat(in_value);
+        if (parsed_value <= 1) {
+          if (parsed_value <= 1 && parsed_value >= 0) {
+            return '20%';
+          } else if (parsed_value <= 0) {
+            return '20%';
+          } else {
+            if ((1 - border_margin) < parsed_value) {
+              return '20%';
+            } else {
+              return parsed_value;
+            }
+          }
+        } else {
+          if (bottom_cap_actual_value > parsed_value) {
+            return '20%'
+          } else {
+            return parsed_value;
+          }
+        }
+      } else {
+        return parsed_value;
+      }
+    }
+
     if (feedback_textarea){
       feedback_textarea.style.zIndex = z_index;
       feedback_textarea.style.top = feedback_textarea_top;
       feedback_textarea.style.width = feedback_textarea_width;
-      if (feedback_textarea_right){
+      feedback_textarea.style.overflowY = 'scroll';
+      if (feedback_textarea_right && feedback_textarea.style.right === null ){
         feedback_textarea.style.right =  feedback_textarea_right;
       }
-      if (feedback_textarea_left){
+      if (feedback_textarea_left && feedback_textarea.style.left === null){
         feedback_textarea.style.left =  feedback_textarea_left;
       }
+      feedback_textarea.style.bottom = return_capped_bottom(feedback_textarea.style.bottom,"90%");
+      console.log(feedback_textarea.style.bottom);
     }
     if (speava_all_others){
       speava_all_others.style.zIndex = z_index;
       speava_all_others.style.top = elem_others_style_top;
-      if (elem_others_style_right) {
+      speava_all_others.style.overflowY = 'scroll';
+      speava_all_others.style.bottom = return_capped_bottom(speava_all_others.style.bottom,"80%");
+      console.log(feedback_textarea.style.bottom);
+      if (elem_others_style_right && speava_all_others.style.right === null) {
         speava_all_others.style.right = elem_others_style_right;
       }
-      if (elem_others_style_width) {
+      if (elem_others_style_width && speava_all_others.style.width === null) {
         speava_all_others.style.width = elem_others_style_width;
       }
     }
     if (fixed_part_of_utterance){
       fixed_part_of_utterance.style.zIndex = z_index;
+      fixed_part_of_utterance.style.overflowY = 'scroll';
       interim_part_of_utterance.style.zIndex = z_index;
+      interim_part_of_utterance.style.overflowY = 'scroll';
     }
     // if (notification_area){
     //   notification_area.style.zIndex = z_index;
@@ -2856,18 +2912,29 @@ try {
 
     if (speava_session_notification){
       speava_session_notification.style.zIndex = z_index;
-      speava_session_notification.style.top = "10%";
-      speava_session_notification.style.bottom = "80%";
+      if (speava_session_notification.style.top === ""){
+        speava_session_notification.style.top = "10%";
+      }
+      // speava_session_notification.style.bottom = "80%";
+      speava_session_notification.style.overflowY = 'scroll';
+      speava_session_notification.style.bottom = return_capped_bottom(speava_session_notification.style.bottom,notification_area_bottom);
     }
     if (speava_caption_reaction){
       speava_caption_reaction.style.zIndex = z_index;
-      speava_caption_reaction.style.top = "20%";
-      speava_caption_reaction.style.bottom = "20%";
+      console.log(speava_caption_reaction.style.top);
+      if (speava_caption_reaction.style.top === "") {
+        speava_caption_reaction.style.top = "70%";
+      }
+      // speava_caption_reaction.style.bottom = "20%";
+      speava_caption_reaction.style.overflowY = 'scroll';
+      speava_caption_reaction.style.bottom = return_capped_bottom(speava_caption_reaction.style.bottom,"30%");
     }
 
     if (buttons_for_command){
       buttons_for_command.style.zIndex = z_index;
-      buttons_for_command.style.top = buttons_style_top;
+      if (buttons_for_command.style.top === ""){
+        buttons_for_command.style.top = buttons_style_top;
+      }
       buttons_for_command.style.right = buttons_style_right;
     }
     if (speava_valid_thru_text){

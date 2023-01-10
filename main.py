@@ -41,6 +41,8 @@ from vocab_suggest import get_frequently_used_words
 from vocab_suggest import suggest_words
 from vocab_suggest import extract_words_from_response
 from vocab_suggest import remove_stopwords_entry
+from vocab_suggest import grammatical_error_all
+from vocab_suggest import grammatical_error_df
 from save_to_storage import get_caption_html
 from save_to_storage import get_delta
 from save_to_storage import get_blending_logs
@@ -61,6 +63,7 @@ from  google.oauth2.credentials import Credentials
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
+from google.auth.exceptions import RefreshError
 import os
 
 DB_NAME = "main.db"
@@ -441,7 +444,7 @@ def return_heartbeat():
 
         session_string = session_id
 
-    print(data_json['transcript'])
+    # print(data_json['transcript']) #disable for non latin participant names
     df = pd.DataFrame(data_json['transcript'])
     df.columns = ['dateStart','dateEnd',
                   'actor','text']
@@ -1064,6 +1067,13 @@ def return_all_results():
                       "google_userid": google_userid, "google_part_of_email": google_part_of_email}
 
         data = globals()[function_item](**kwargs)
+        data_show = {"notification": {"text": f"<H2>FUNCTION:{function_item}</H2>"},
+                     "heading": "Frequency",
+                     "setting":
+                         {"duration": 500}
+                     }
+        data_item = jsonify(data_show)
+        data_all.append(data_item.json)
         data_all.append(data.json)
     text = render_template('show_all.html', data=data_all)
     return text
@@ -1616,25 +1626,36 @@ def get_vocab_coverage(session_string="",option_settings={}, username:str="all",
     data_json = {}
     share_text = ''
     share_text += '<div>' \
-                  f'<span class="head" style="font-size:48px;">remaining language to cover:</span>' \
-                  f'<span class="head" style="font-size:96px;">{str(vocab_list_used_counter_remaining)}</span>' \
-                  f'<span class="head" style="font-size:48px;">covered language:</span>' \
-                  f'<span class="head" style="font-size:96px;">{str(vocab_list_used_counter)}</span><br>' \
-                  f'<span class="head" style="font-size:48px;">target language:</span>' \
-                  f'<span class="head" style="font-size:96px;">{len(vocab_list)}</span>' \
+                  f'<span class="head" style="font-size:medium;">remaining language to cover:</span>' \
+                  f'<span class="head" style="font-size:medium;">{str(vocab_list_used_counter_remaining)}</span>' \
+                  f'<span class="head" style="font-size:medium;">covered language:</span>' \
+                  f'<span class="head" style="font-size:medium;">{str(vocab_list_used_counter)}</span><br>' \
+                  f'<span class="head" style="font-size:medium;">target language:</span>' \
+                  f'<span class="head" style="font-size:medium;">{len(vocab_list)}</span>' \
                   '</div>'
     share_text += '<div>'
-    for item in vocab_list:
+    share_text += '<table><tr>'
+    share_text += '</tr>'
+
+    inserted_div_now = True
+    for index, item in enumerate(vocab_list):
+        inserted_div_now = False
+        if (index % 10) == 0:
+            share_text += '<tr>'
         # share_text += f'<div><span class="item" style="width:40px;">[{str(vocab_list_used[item])}]</span>' \
         #               f'<span class="item_blue">{item}</span></div>'
         if vocab_list_used[item] == 0:
-            share_text += f'<span class="item_red"  style="font-size:48px;">{item},</span>'
+            share_text += f'<td><span class="item_red"  style="font-size:medium;">{item},</span></td>'
         elif ( 1 <= vocab_list_used[item] <= 2 ):
-            share_text += f'<span class="item_blue" style="font-size:24px;">{item},</span>'
+            share_text += f'<td><span class="item_blue" style="font-size:small;">{item},</span></td>'
         elif (3 <= vocab_list_used[item] ):
-            share_text += f'<span class="item_blue" style="font-size:12px;">{item},</span>'
+            share_text += f'<td><span class="item_blue" style="font-size:smaller;">{item},</span></td>'
+        if (index % 10) == 9:
+            share_text += '</tr>'
+            inserted_div_now = True
 
-    share_text += '</div>'
+    if inserted_div_now != True:
+        share_text += '</tr>'
     share_text += '<div><span class="text_item">Activate those vocab.</span></div>'
     data_json["setting"] = {"duration": 500}
     data_json["notification"] = { "text": share_text }
@@ -1642,6 +1663,87 @@ def get_vocab_coverage(session_string="",option_settings={}, username:str="all",
     data_return = jsonify(data_json)
 
     return data_return
+
+def get_grammatical_error(session_string="",google_userid:str="",google_part_of_email:str="",
+                        is_to_download:bool=False):
+    dbname = DB_NAME
+    conn = sqlite3.connect(dbname)
+
+    df_end_max = pd.read_sql("SELECT max(end) FROM caption where " + \
+                                  " session = '" + session_string + "'"
+                                  , conn)
+    df_grammatical_end_max = pd.read_sql("SELECT max(start) FROM caption where " + \
+                                  " session = '" + session_string + "'"
+                                  , conn)
+    conn.commit()
+    conn.close()
+
+    # if df_end_max is not None:
+    #     last_processed_time = pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime()
+    #     if len(df_grammatical_end_max) != 0:
+    #         last_processed_time_grammar = pd.to_datetime(df_grammatical_end_max['max(start)'])[0].to_pydatetime()
+    #     else:
+    #         last_processed_time_grammar =
+    #     if ((last_processed_time + datetime.timedelta(minutes=2)) < datetime.datetime.now()):
+    #         print("updated due to max elapsed time")
+    #         df = grammatical_error_all(session_string=session_string, since_last_update=True, include_last_record=True)
+    #         vocab_result_save(df=df, db_target_name="grammatical_log")
+
+    df = grammatical_error_all(session_string=session_string, since_last_update=True, include_last_record=True)
+    vocab_result_save(df=df, db_target_name="grammatical_log")
+    df_grammar_session = grammatical_error_df(session=session_string)
+
+    # dbname = DB_NAME
+    # conn = sqlite3.connect(dbname)
+    # df_start_min_per_session = pd.read_sql("SELECT session, min(start) FROM caption group by session", conn)
+    # conn.commit()
+    # conn.close()
+
+    # df_grammar_session.sort_values(['level', 'count(vocab)'], ascending=[False, False], inplace=True)
+    share_text = '<br>'
+    share_text += '<div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:24px;">'
+    # share_text += f'<span style="width:300p;display:inline-block" class="head">text</span>' \
+    #               f'<span style="width:82px;display:inline-block" class="head">session</span>' \
+    #               f'<span style="width:240px;display:inline-block" class="head">caption_id</span>' \
+    #               f'<span style="width:240px;display:inline-block" class="head">start</span>' \
+    #               f'<span style="width:240px;display:inline-block" class="head">start</span>' \
+    #               f'</div>'
+    # share_text += '<br><br><br>'
+    # for index, row in df_grammar_session.iterrows():
+    #     share_text += '<br><div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+    #     share_text += f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["session"]}</span>' \
+    #                   f'<span style="width:82px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["caption_id"]}</span>' \
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["start"]}</span>' \
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["category"]}</span>'\
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["ruleId"]}</span>'\
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["ruleIssueType"]}</span>'\
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["error_message"]}</span>'\
+    #                   f'<span style="width:240px;font-size:16px;display:inline-block;height:12px;margin:0;padding:0px;">{row["text_correction"]}</span>'
+    #     share_text += '</div>'
+    share_text += f'<span style="width:80px;display:inline-block" class="head">start</span>' \
+                  f'<span style="width:120px;display:inline-block" class="head">rule ID</span>' \
+                  f'<span style="width:400px;display:inline-block" class="head">error message</span>' \
+                  f'<span style="width:400px;display:inline-block" class="head">correction </span>' \
+                  f'</div>'
+    share_text += '<br><br><br>'
+    for index, row in df_grammar_session.iterrows():
+        share_text += '<br><div style="font-size:16px;display:inline-block;border: 1px solid #333333;height:12px;margin:0;line-height:12px;padding:0px;">'
+        share_text += f'<span style="width:80px;font-size:16px;display:inline-block;height:12px;line-break:anywhere;margin:0;padding:0px;">{row["start"]}</span>' \
+                      f'<span style="width:120px;font-size:16px;display:inline-block;height:12px;line-break:anywhere;margin:0;padding:0px;">{row["ruleId"]}</span>'\
+                      f'<span style="width:400px;font-size:16px;display:inline-block;height:12px;line-break:auto;margin:0;padding:0px;">{row["error_message"]}</span>'\
+                      f'<span style="width:400px;font-size:16px;display:inline-block;height:12px;line-break:auto;margin:0;padding:0px;">{row["text_correction"]}</span>'
+        share_text += '</div>'
+
+
+    data_show = {"notification": {"text": share_text},
+                 "heading": "Frequency",
+                 "setting":
+                     {"duration": 500}
+                 }
+    data_return = jsonify(data_show)
+
+    return data_return
+
 
 def get_vocab_frequency(session_string="",google_userid:str="",google_part_of_email:str="",
                         is_to_download:bool=False):
@@ -1792,15 +1894,19 @@ def get_vocab_frequency_short(session_string="",google_userid:str="",google_part
                                       , conn)
         conn.commit()
         conn.close()
-
+        df_end_max.dropna(inplace=True)
+        if len(df_end_max) == 0:
+            df_end_max = None
         if df_end_max is not None:
             last_processed_time = pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime()
             if ((last_processed_time + datetime.timedelta(minutes=2)) < datetime.datetime.now()):
                 print("updated due to max elapsed time")
                 df = vocab_calculate_all(session_string=session_string, since_last_update=True, include_last_record=True)
                 vocab_result_save(df=df, db_target_name="vocab_aggregate")
-        retrieve_last_vocab =  pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime() - datetime.timedelta(minutes=2)
-        df_freq_session = get_frequently_used_words(session=session_string,start=retrieve_last_vocab)
+            retrieve_last_vocab =  pd.to_datetime(df_end_max['max(end)'])[0].to_pydatetime() - datetime.timedelta(minutes=2)
+            df_freq_session = get_frequently_used_words(session=session_string,start=retrieve_last_vocab)
+        else:
+            df_freq_session = get_frequently_used_words(session=session_string)
 
     dbname = DB_NAME
     conn = sqlite3.connect(dbname)
@@ -2697,6 +2803,12 @@ def test_api_request():
     given_name = exe_info['given_name']
     email_raw = exe_info['email']
     email = mask_email_address(email_raw)
+    if credentials.expiry is not None:
+        expires_in = str((credentials.expiry - datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)).seconds)
+    else:
+        expires_in = "go back to start page to see"
+  # expires_in = int(expires_in_result.json()['expires_in'])
+  # expires_at = datetime.datetime.fromtimestamp(int(expires_in_result.json()['exp']))
   except Exception as e:
       print('An error occurred: %s', e)
       return flask_redirect('authorize')
@@ -2707,8 +2819,7 @@ def test_api_request():
   #              credentials in a persistent database instead.
   flask_session['credentials'] = credentials_to_dict(credentials)
 
-  kwargs = {"userid": userid, "given_name": given_name, "email": email}
-
+  kwargs = {"userid": userid, "given_name": given_name, "email": email, "expires_in": expires_in}
   text = render_template('lca_toppage.html', **kwargs)
   return text
 
@@ -2838,22 +2949,56 @@ def list_session_main():
 def personalize_for_session_vocab_main():
 
     session_string_str = request.form.get("session_id",None)
+    session_string_internal_str = request.form.get("internal_session_id",None)
+    if request.method == "GET":
+        session_string_internal_str = request.args.get('session')
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if google_userid is None:
+        return flask_redirect("authorize")
+    if session_string_internal_str is None:
+        session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
+    else:
+        session_access_allowed, external_session_name = is_allowed_to_access(session_id=session_string_internal_str,
+                                                                             access_user=google_userid)
+        if session_access_allowed == False:
+            return f"No authorization to read session {session_string_internal_str}"
+        else:
+            session_string_str = external_session_name
+
     google_userid, google_part_of_email = get_user_id_from_session()
     session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
     session_string = session_id
 
-    text = personalize_for_session_vocab(session_string=session_string,email_part=google_part_of_email)
+    text = personalize_for_session_vocab(session_string=session_string,ext_session_name = session_string_str,
+                                         email_part=google_part_of_email)
     return text
 
 @app.route('/personalize_session_settings', methods=['POST', 'GET'])
 def personalize_for_session_settings_main():
 
     session_string_str = request.form.get("session_id",None)
+    session_string_internal_str = request.form.get("internal_session_id",None)
+    if request.method == "GET":
+        session_string_internal_str = request.args.get('session')
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if google_userid is None:
+        return flask_redirect("authorize")
+    if session_string_internal_str is None:
+        session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
+    else:
+        session_access_allowed, external_session_name = is_allowed_to_access(session_id=session_string_internal_str,
+                                                                             access_user=google_userid)
+        if session_access_allowed == False:
+            return f"No authorization to read session {session_string_internal_str}"
+        else:
+            session_string_str = external_session_name
+
     google_userid, google_part_of_email = get_user_id_from_session()
     session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
     session_string = session_id
 
-    text = personalize_for_session_settings(session_string=session_string,email_part=google_part_of_email)
+    text = personalize_for_session_settings(session_string=session_string,ext_session_name = session_string_str,
+                                            email_part=google_part_of_email)
     return text
 
 @app.route('/personalize_session_accept_authorization', methods=['POST', 'GET'])
@@ -2871,6 +3016,8 @@ def personalize_for_session_authorization_main():
     if request.method == "GET":
         session_string_internal_str = request.args.get('session')
     google_userid, google_part_of_email = get_user_id_from_session()
+    if google_userid is None:
+        return flask_redirect("authorize")
     if session_string_internal_str is None:
         session_id = get_sessionid(session_string=session_string_str,owner=google_userid)
         session_string = session_id
@@ -2912,6 +3059,10 @@ def personalize_calling_function_main():
 
 @app.route('/get_vocab', methods=['POST', 'GET'])
 def get_vocabs():
+    # authenticate to load resources (to log and avoid overloading)
+    google_userid, google_part_of_email = get_user_id_from_session()
+    if google_userid is None:
+        return flask_redirect("authorize")
 
     text = render_template('get_vocab_list.html')
 
@@ -2946,10 +3097,13 @@ def get_user_id_from_session(force_no_mask:bool=False):
             account_email = mask_email_address(useremail=useremail)
         else:
             account_email = useremail
+    except RefreshError as e:
+        return None, None
+            # "Authentication expired. Authenticate again. At the start page"
     except Exception as e:
         print('An error occurred: %s', e)
         if (e.args[1]['error'] == "invalid_grant"):
-            return None
+            return None, None
     # Save credentials back to session in case access token was refreshed.
     # ACTION ITEM: In a production app, you likely want to save these
     #              credentials in a persistent database instead.
@@ -3134,6 +3288,21 @@ def create_db():
         'rel TEXT,'
         'sim TEXT'
         ' )')
+    cur.execute(
+        'CREATE TABLE IF NOT EXISTS grammatical_log ('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'session VARCHAR(40),'
+        'caption_id INTEGER,'
+        'start DATETIME(6),'
+        'actor VARCHAR(30), '
+        'category MESSAGE_TEXT, '
+        'ruleId MESSAGE_TEXT, '        
+        'text MESSAGE_TEXT, '
+        'ruleIssueType MESSAGE_TEXT, '
+        'error_message MESSAGE_TEXT, '
+        'text_correction MESSAGE_TEXT'
+        ')'
+    )
     conn.commit()
     conn.close()
 

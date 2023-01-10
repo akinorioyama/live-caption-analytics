@@ -50,9 +50,11 @@ td {
         <td>id</td>
         <td>Session name</td>
         <td>Show without extension</td>
-        <td>Show full info</a></td>
-        <td>Add/remove authorized users</a></td>
-        <td>Show runtime captioning</td>
+        <td>Show full info</td>
+        <td style="writing-mode:vertical-rl; transform:rotate(180deg); height: 100px;">Add/remove authorized users</td>
+        <td style="writing-mode:vertical-rl; transform:rotate(180deg); height: 100px;">personalize session</td>
+        <td style="writing-mode:vertical-rl; transform:rotate(180deg); height: 100px;">personalize session to import from resources</td>
+        <td style="writing-mode:vertical-rl; transform:rotate(180deg); height: 100px;">Show runtime captioning</td>
         <td>Download caption</td>
         <td>Download vocab</td>
         <td>created at</td>
@@ -62,12 +64,14 @@ td {
     <tr>
         <td>{{item['session_id']}}</td>
         <td>{{item['external_session_name']}}</td>
-        <td><a href="/run_on_server?session={{item['session_id']}}">full info</a></td>
-        <td><a href="/render_in_full?session={{item['session_id']}}">full info</a></td>
-        <td><a href="/personalize_session_authorization?session={{item['session_id']}}">Change</a></td>
-        <td><a href="/caption?session={{item['session_id']}}">runtime captioning</a></td>
-        <td><a href="/download_caption?session={{item['session_id']}}">Download</a></td>
-        <td><a href="/download_vocab_frequency?session={{item['session_id']}}">Download</a></td>
+        <td><a href="/run_on_server?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">full info</a></td>
+        <td><a href="/render_in_full?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">full info</a></td>
+        <td><a href="/personalize_session_authorization?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">Change</a></td>
+        <td><a href="/personalize_session_settings?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">Change</a></td>
+        <td><a href="/personalize_session?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">Change</a></td>
+        <td><a href="/caption?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">runtime captioning</a></td>
+        <td><a href="/download_caption?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">Download</a></td>
+        <td><a href="/download_vocab_frequency?session={{item['session_id']}}" target="_blank" rel="noopener noreferrer">Download</a></td>
         <td>{{item['created_on']}}</td>
     </tr>
 {% endfor %}

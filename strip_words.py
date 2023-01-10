@@ -82,22 +82,57 @@ def spacy_wordnet_wrapper(doc):
 def get_site_text(url):
 
     # user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36'
+    html = None
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    driver = webdriver.Chrome(chrome_options=options)
-    driver.get(url)
-    WebDriverWait(driver,10)
-    html = driver.page_source.encode('utf-8')  # more sophisticated methods may be available
-    driver.close()
-    driver.quit()
+    try:
+        res = requests.get(url=url,timeout=(10.0,30.0))
+        html = res.text
+        soup = BeautifulSoup(html, "html.parser")
+        texts = [p_element.text for p_element in soup.find_all('p')]
+        if len('.'.join(texts)) >= 100:
+            if soup.title is not None:
+                title = soup.title.string
+                print("text retrieved with requests.get()")
+                return texts,title
+            else:
+                html = None
 
+    except Exception as e:
+        print(e)
+        html = None
+        pass
+
+    try:
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--incognito")
+        options.add_argument("--nogpu")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1280,1280")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--enable-javascript")
+        driver = webdriver.Chrome(chrome_options=options)
+        driver.get(url)
+        WebDriverWait(driver,30)
+        html = driver.page_source.encode('utf-8')
+        driver.close()
+        driver.quit()
+    except Exception as e:
+        print(e)
+
+    if html is None:
+        return None, None
     soup = BeautifulSoup(html, "html.parser")
-
-
     texts = [p_element.text for p_element in soup.find_all('p')]
-    title = soup.title.string
-    return texts,title
+
+    if len('.'.join(texts)) >= 100:
+        if soup.title is not None:
+            title = soup.title.string
+            return texts,title
+        else:
+            html = None
+    else:
+        return None, None
 
 def create_new_df_for_word_list(df:pd.DataFrame=None):
 
@@ -251,8 +286,13 @@ def show_text_from_url():
     data = request.get_data().decode('utf-8')
     url = request.form.get("url")
     df_site_text = read_from_storage(url)
+    df_site_text = None
     if df_site_text is None:
         texts,title = get_site_text(url)
+        if texts is None or title is None:
+            print("Text not retrieved.")
+            print(url)
+            return("Text not retrieved.")
         df_site_text = save_to_storage(url,texts,title)
 
     title_text = df_site_text['title_of_site'][0]
@@ -296,7 +336,7 @@ def show_text_from_url():
 #     return text
 
 # @app.route('/personalize_session_settings', methods=['POST', 'GET'])
-def personalize_for_session_settings(session_string:str="",email_part:str=""):
+def personalize_for_session_settings(session_string:str="",email_part:str="",ext_session_name:str=""):
 
     data = request.get_data().decode('utf-8')
     text_to_avoid = request.form.get("text_to_avoid",None)
@@ -304,11 +344,15 @@ def personalize_for_session_settings(session_string:str="",email_part:str=""):
     vocab_to_cover = request.form.get("vocab_to_cover",None)
     # session_string_str = request.form.get("session_id",None)
     username = request.form.get("username",None)
+    button_command_value = request.form.get("command",None)
 
     kwargs = {}
     for a in request.form.keys():
         kwargs[a] =request.form.get(a)
-
+    if request.method == "GET":
+        session_string = request.args.get('session')
+        kwargs['internal_session_id'] = session_string
+    kwargs['session_id'] = ext_session_name
     df_session_settings = None
     if session_string is not None:
         dbname = DB_NAME
@@ -341,9 +385,13 @@ def personalize_for_session_settings(session_string:str="",email_part:str=""):
                 if len(df_session_vocab_to_cover) != 0:
                     kwargs['vocab_to_cover'] = ",".join(df_session_vocab_to_cover['value'])
             else:
-                kwargs['vocab_to_cover'] = vocab_to_cover
+                if button_command_value is None:
+                    # overwrite if not save
+                    kwargs['vocab_to_cover'] = ",".join(df_session_vocab_to_cover['value'])
+                else:
+                    kwargs['vocab_to_cover'] = vocab_to_cover
     kwargs["email"]= email_part
-    button_command_value = request.form.get("command",None)
+    # button_command_value = request.form.get("command",None)
     if button_command_value == "save"  and session_string is not None:
         print("save words to db!!")
         conn = sqlite3.connect(DB_NAME)
@@ -400,7 +448,7 @@ def personalize_for_session_authorization(session_string:str="",email_part:str="
     if request.method == "GET":
         session_string = request.args.get('session')
         kwargs['internal_session_id'] = session_string
-
+    kwargs['session_id'] = ext_session_name
     button_command_value = request.form.get("command",None)
     if button_command_value == "speava_generate_token"  and session_string is not None:
         session_in_int = int(session_string)
@@ -719,7 +767,7 @@ def personalize_calling_function(email_part: str = "", userid: str = ""):
         return text
 
 # @app.route('/personalize_session', methods=['POST', 'GET'])
-def personalize_for_session_vocab(session_string:str="",email_part:str=""):
+def personalize_for_session_vocab(session_string:str="",email_part:str="",ext_session_name:str=""):
 
     data = request.get_data().decode('utf-8')
     text_to_be_parsed = request.form.get('text_to_parse',"")
@@ -743,6 +791,10 @@ def personalize_for_session_vocab(session_string:str="",email_part:str=""):
     domain_list = request.form.get("domains",None)
     for a in request.form.keys():
         kwargs[a] =request.form.get(a)
+    if request.method == "GET":
+        session_string = request.args.get('session')
+        kwargs['internal_session_id'] = session_string
+    kwargs['session_id'] = ext_session_name
     if request.form.get('alert_overused_words',None) == "1":
         kwargs['alert_overused_words'] = "checked"
     if request.form.get('suggest_alternatives_for_overused_words',None) == "1":

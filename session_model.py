@@ -16,6 +16,7 @@ allowed_function_list = ['get_default_sample_1',
                          'get_word_per_second',
                          'get_issued_prompts',
                          'get_vocab_frequency_short',
+                         'get_grammatical_error',
                          'get_all_frozen_captions']
 
 def mask_email_address(useremail:str=""):

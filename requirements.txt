@@ -12,3 +12,4 @@ spacy-wordnet
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
+language-tool-python
