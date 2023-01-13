@@ -3,6 +3,7 @@ function save_options() {
   var speava_session_record = document.getElementById('speava_session_record').value;
   var speava_session_spreadsheet_post = document.getElementById('speava_session_spreadsheet_post').value;
   var speava_session_username = document.getElementById('speava_session_username').value;
+  var speava_session_user_caption_label = document.getElementById('speava_session_user_caption_label').value;
   var speava_session_log_string = document.getElementById('speava_session_log_string').value;
   var speava_session_send_raw = document.getElementById('speava_session_send_raw').checked;
   var speava_session_post = document.getElementById('speava_session_post').checked;
@@ -23,6 +24,7 @@ function save_options() {
     speava_session_record: speava_session_record,
     speava_session_spreadsheet_post: speava_session_spreadsheet_post,
     speava_session_username:speava_session_username,
+    speava_session_user_caption_label:speava_session_user_caption_label,
     speava_session_log_string : speava_session_log_string,
     speava_session_send_raw : speava_session_send_raw,
     speava_session_post : speava_session_post,
@@ -54,6 +56,7 @@ function restore_options() {
     speava_session_record: 'enter URL',
     speava_session_spreadsheet_post: 'enter URL',
     speava_session_username: 'Default user',
+    speava_session_user_caption_label: 'You',
     speava_session_log_string: 'Wonder,Mistakes',
     speava_session_send_raw: false,
     speava_session_post: false,
@@ -71,6 +74,7 @@ function restore_options() {
     document.getElementById('speava_session_record').value = items.speava_session_record;
     document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
     document.getElementById('speava_session_username').value = items.speava_session_username;
+    document.getElementById('speava_session_user_caption_label').value = items.speava_session_user_caption_label;
     document.getElementById('speava_session_log_string').value = items.speava_session_log_string;
     document.getElementById('speava_session_send_raw').checked = items.speava_session_send_raw;
     document.getElementById('speava_session_post').checked = items.speava_session_post;

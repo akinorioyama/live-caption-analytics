@@ -83,7 +83,7 @@ try {
   const KEY_TRANSCRIPT_IDS = 'hangouts';
 
   // Used to identify when the user is the speaker when listing the meeting participants
-  const SEARCH_TEXT_SPEAKER_NAME_YOU = 'You';
+  let SEARCH_TEXT_SPEAKER_NAME_YOU = chrome.i18n.getMessage('meet_user_label_for_caption');
 
   // Used to identify when a meeting has no name
   const SEARCH_TEXT_NO_MEETING_NAME = 'Meeting details';
@@ -128,6 +128,10 @@ try {
   let SpeechRecognition;
   let recognition;
   let finalTranscript = '';
+  let captionsButtonOn_xpath;
+  let captionsButtonOff_xpath;
+  let captionsButtonOn_label;
+  let captionsButtonOff_label;
 
   let speava_select_language;
   // adjusted code part from https://www.google.com/intl/ja/chrome/demos/speech.html
@@ -419,6 +423,9 @@ try {
       speava_session_record: 'enter URL',
       speava_session_spreadsheet_post: 'enter URL',
       speava_session_username: 'Default user',
+      speava_session_user_caption_label: 'You',
+      speava_session_caption_label_on: '',
+      speava_session_caption_label_off: '',
       speava_session_log_string: 'Wonder,Mistakes',
       speava_session_send_raw: false,
       speava_session_post: false,
@@ -443,6 +450,22 @@ try {
         speava_server_url_to_record = items.speava_session_record;
         speava_server_url_to_post = items.speava_session_spreadsheet_post;
         speava_server_username = items.speava_session_username;
+        if (items.speava_session_user_caption_label === "" ||items.speava_session_user_caption_label===null) {
+          SEARCH_TEXT_SPEAKER_NAME_YOU = meet_user_label_for_caption;
+        } else {
+          SEARCH_TEXT_SPEAKER_NAME_YOU = items.speava_session_user_caption_label;
+        }
+        if (items.speava_session_caption_label_on === "" || items.speava_session_caption_label_on === null){
+          captionsButtonOn_label  = chrome.i18n.getMessage('meet_caption_button_on')
+        } else {
+          captionsButtonOn_label  = items.speava_session_caption_label_on;
+        }
+        if (items.speava_session_caption_label_off === "" || items.speava_session_caption_label_off === null){
+          captionsButtonOff_label  = chrome.i18n.getMessage('meet_caption_button_off')
+        } else {
+          captionsButtonOff_label  = items.speava_session_caption_label_off;
+        }
+        set_caption_buttons_xpath(captionsButtonOn_label,captionsButtonOff_label);
         speava_session_log_string = items.speava_session_log_string;
         speava_session_send_raw =             items.speava_session_send_raw
         speava_session_post =                 items.speava_session_post
@@ -472,7 +495,10 @@ try {
       speava_session_record: 'enter URL',
       speava_session_spreadsheet_post: 'enter URL',
       speava_session_username: 'Default user',
+      speava_session_user_caption_label: 'You',
       speava_session_log_string: 'Wonder,Mistakes',
+      speava_session_caption_label_on: '',
+      speava_session_caption_label_off: '',
       speava_session_send_raw: false,
       speava_session_post: false,
       speava_session_show: false,
@@ -488,9 +514,12 @@ try {
       speava_server_url_to_record = items.speava_session_record;
       speava_server_url_to_post = items.speava_session_spreadsheet_post;
       speava_server_username = items.speava_session_username;
+      SEARCH_TEXT_SPEAKER_NAME_YOU = items.speava_session_user_caption_label;
+      captionsButtonOn_label  = items.speava_session_caption_label_on;
+      captionsButtonOff_label = items.speava_session_caption_label_off;
       speava_session_log_string = items.speava_session_log_string;
       speava_session_send_raw =             items.speava_session_send_raw
-      speava_session_post =                 items.speava_session_post
+      speava_session_post =                 items.speava_session_post  
       speava_session_show =                 items.speava_session_show
       speava_session_notification =         items.speava_session_notification
       speava_session_unrecognized =         items.speava_session_unrecognized
@@ -503,13 +532,17 @@ try {
       let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
       SPEAKER_NAME_MAP = obj;
       currentTranscriptId = speava_session_id;
+      set_caption_buttons_xpath(captionsButtonOn_label,captionsButtonOff_label)
       applyFontColor(speava_session_text_color);
       applyOptionStyles();
     });
     DEBUG = getOrSet('setting.debug', false);
     READONLY = getOrSet('setting.readonly', false);
   };
-
+  const set_caption_buttons_xpath = (on_label,off_label) => {
+    captionsButtonOn_xpath  = `//button[@aria-label='` + on_label + `']`;
+    captionsButtonOff_xpath = `//button[@aria-label='` + off_label + `']`;
+  }
   ////////////////////////////////////////////////////////////////////////////
   // DOM Utilities
   ////////////////////////////////////////////////////////////////////////////
@@ -564,7 +597,8 @@ try {
   // Turn Google's captions on
   // -------------------------------------------------------------------------
   const turnCaptionsOn = () => {
-    const captionsButtonOn = xpath(`//button[@aria-label="Turn on captions (c)"]`, document);
+    const captionsButtonOn = xpath(captionsButtonOn_xpath, document);
+    // const captionsButtonOn = xpath(`//button[@aria-label="Turn on captions (c)"]`, document);
     if (captionsButtonOn) {
       captionsButtonOn.click();
       weTurnedCaptionsOn = true;
@@ -575,7 +609,8 @@ try {
   // Turn Google's captions off
   // -------------------------------------------------------------------------
   const turnCaptionsOff = () => {
-    const captionsButtonOff = xpath(`//button[@aria-label='Turn off captions (c)']`, document);
+    const captionsButtonOff = xpath(captionsButtonOff_xpath, document);
+    // const captionsButtonOff = xpath(`//button[@aria-label='Turn off captions (c)']`, document);
 
     if (captionsButtonOff) {
       captionsButtonOff.click();
@@ -1803,14 +1838,21 @@ try {
           }
           // dialog.onload = update_select_language();
           // Saves options to chrome.storage
+          const propose_caption_text = () => {
+             document.getElementById('speava_session_caption_label_on').value  = chrome.i18n.getMessage('meet_caption_button_on');
+             document.getElementById('speava_session_caption_label_off').value = chrome.i18n.getMessage('meet_caption_button_off');
+          }
           const save_options = () => {
             var speava_session_record = document.getElementById('speava_session_record').value;
             var speava_session_spreadsheet_post = document.getElementById('speava_session_spreadsheet_post').value;
             var speava_session_username = document.getElementById('speava_session_username').value;
+            SEARCH_TEXT_SPEAKER_NAME_YOU = document.getElementById('speava_session_user_caption_label').value;
             speava_session_log_string = document.getElementById('speava_session_log_string').value;
             speava_session_send_raw = document.getElementById('speava_session_send_raw').checked;
             speava_session_post = document.getElementById('speava_session_post').checked;
             speava_session_show = document.getElementById('speava_session_show').checked;
+            captionsButtonOn_label = document.getElementById('speava_session_caption_label_on').value;
+            captionsButtonOff_label = document.getElementById('speava_session_caption_label_off').value;
             speava_session_notification = document.getElementById('speava_session_notification_option').checked;
             speava_session_unrecognized = document.getElementById('speava_session_unrecognized').checked;
             speava_session_prompt = document.getElementById('speava_session_prompt').checked;
@@ -1828,6 +1870,7 @@ try {
             speava_server_url_to_record = speava_session_record;
             speava_server_url_to_post = speava_session_spreadsheet_post;
             speava_server_username = speava_session_username;
+            set_caption_buttons_xpath(captionsButtonOn_label,captionsButtonOff_label);
             let obj = { [SEARCH_TEXT_SPEAKER_NAME_YOU] :speava_server_username};
             SPEAKER_NAME_MAP = obj;
             applyFontColor(speava_session_text_color);
@@ -1842,6 +1885,9 @@ try {
               speava_session_record: speava_session_record,
               speava_session_spreadsheet_post: speava_session_spreadsheet_post,
               speava_session_username:speava_session_username,
+              speava_session_user_caption_label: SEARCH_TEXT_SPEAKER_NAME_YOU,
+              speava_session_caption_label_on: captionsButtonOn_label,
+              speava_session_caption_label_off:captionsButtonOff_label,
               speava_session_log_string : speava_session_log_string,
               speava_session_send_raw : speava_session_send_raw,
               speava_session_post : speava_session_post,
@@ -1927,6 +1973,9 @@ try {
               speava_session_record: 'enter URL',
               speava_session_spreadsheet_post: 'enter URL',
               speava_session_username: 'Default user',
+              speava_session_user_caption_label: 'You',
+              speava_session_caption_label_on: captionsButtonOn_label,
+              speava_session_caption_label_off: captionsButtonOff_label,
               speava_session_log_string: 'Wonder,Mistakes',
               speava_session_send_raw: false,
               speava_session_post: false,
@@ -1944,6 +1993,23 @@ try {
               document.getElementById('speava_session_record').value = items.speava_session_record;
               document.getElementById('speava_session_spreadsheet_post').value = items.speava_session_spreadsheet_post;
               document.getElementById('speava_session_username').value = items.speava_session_username;
+              if (items.speava_session_user_caption_label === "" || items.speava_session_user_caption_label === null) {
+                document.getElementById('speava_session_user_caption_label').value = SEARCH_TEXT_SPEAKER_NAME_YOU;
+              } else {
+                document.getElementById('speava_session_user_caption_label').value = items.speava_session_user_caption_label;
+              }
+              if (items.speava_session_caption_label_on === "" || items.speava_session_caption_label_on === null) {
+                document.getElementById('speava_session_caption_label_on').value = captionsButtonOn_label;
+              } else {
+                document.getElementById('speava_session_caption_label_on').value = items.speava_session_caption_label_on;
+              }
+              if (items.speava_session_caption_label_off === "" || items.speava_session_caption_label_off === null) {
+                document.getElementById('speava_session_caption_label_off').value = captionsButtonOff_label;
+              } else {
+                document.getElementById('speava_session_caption_label_off').value = items.speava_session_caption_label_off;
+              }
+              // document.getElementById('speava_session_caption_label_on').value = items.speava_session_caption_label_on;
+              // document.getElementById('speava_session_caption_label_off').value = items.speava_session_caption_label_off;
               document.getElementById('speava_session_log_string').value = items.speava_session_log_string;
               document.getElementById('speava_session_send_raw').checked = items.speava_session_send_raw;
               document.getElementById('speava_session_post').checked = items.speava_session_post;
@@ -1969,6 +2035,8 @@ try {
           restore_options();
           document.getElementById('speava_option_save').addEventListener('click',
             save_options);
+          document.getElementById('speava_option_propose_caption_label').addEventListener('click',
+            propose_caption_text);
           document.getElementById('select_language').addEventListener('change', updateCountry);
           document.getElementById('speava_session_record').addEventListener('change', updateWarnSecurity);
             });
@@ -2626,12 +2694,14 @@ try {
     const hostname = document.location.hostname;
     let displayed_container;
     if (hostname.match("meet.google") !== null){
-      cc_button_path = `//button[contains(@aria-label,"captions (c)")]`;
-      const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
-      if ( pathString === null || pathString[2] !== "en") {
-        const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
-        window.alert(msg_string);
-      }
+      cc_button_path = captionsButtonOn_xpath;
+      // cc_button_path = `//button[contains(@aria-label,"captions (c)")]`;
+      // introduce speava_session_user_caption_label to allow multi-language
+      // const pathString = document.location.search.match("[?&]"+"hl"+"(=([^&#]*)|&|#|$)");
+      // if ( pathString === null || pathString[2] !== "en") {
+      //   const msg_string = chrome.i18n.getMessage("alert_to_change_lanauge");
+      //   window.alert(msg_string);
+      // }
       displayed_container = document.evaluate("//div[@role='dialog']",document, null, XPathResult.FIRST_ORDERED_NODE_TYPE).singleNodeValue;
     } else if (hostname.match("zoom") !== null){
       // cc_button_path = `//div[@class="join-audio-container"]`
@@ -2663,13 +2733,13 @@ try {
       feedback_textarea.classList.add('display_none');
       element_caption_reaction.classList.add('display_none');
     }
-    if (buttons === null){
-
-      const captionsButtons = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
-      if (!captionsButtons){
-        return;
-      }
-    }
+    // if (buttons === null){
+    //
+    //   const captionsButtons = xpath(`//button[contains(@aria-label,"captions (c)")]`, document);
+    //   if (!captionsButtons){
+    //     return;
+    //   }
+    // }
     if (speava_access_token_openid==="") {
       const msg_string_auth = chrome.i18n.getMessage("oauth_not_authenticated");
       document.querySelector(`#${ID_TOGGLE_BUTTON_LOGIN}`).classList.remove('on');

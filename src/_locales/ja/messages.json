@@ -3,6 +3,15 @@
     "alert_to_change_lanauge": {
         "message": "URL の最後に ?hl=en を加えてください。一例としては、次のようなURL に変更してください。https://meet.google.com/ccc-cccc-ccc?hl=en"
     },
+    "meet_user_label_for_caption": {
+        "message": "あなた"
+    },
+    "meet_caption_button_on": {
+        "message": "字幕をオンにする（C キー）"
+    },
+    "meet_caption_button_off": {
+        "message": "字幕をオフにする（C キー）"
+    },
     "alart_to_notify_no_pending_transcript": {
         "message" : "画面に残っている字幕がありません。<br>字幕がある時に再度お試しください。"
     },

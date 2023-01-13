@@ -5,6 +5,15 @@
     "alert_to_change_lanauge": {
         "message": "add ?hl=en at the end of the URL. For example, https://meet.google.com/ccc-cccc-ccc?hl=en"
     },
+    "meet_user_label_for_caption": {
+        "message": "You"
+    },
+    "meet_caption_button_on": {
+        "message": "Turn on captions (c)"
+    },
+    "meet_caption_button_off": {
+        "message": "Turn off captions (c)"
+    },
     "alart_to_notify_no_pending_transcript": {
         "message" : "No text in caption.<br> Press when immediate transcript is available."
     },
