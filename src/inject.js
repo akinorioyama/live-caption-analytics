@@ -2713,7 +2713,10 @@ try {
     }
 
     // hide panes if the user is not in a meeting.
-    const captionsButtonAvailability = xpath(cc_button_path, document);
+    let captionsButtonAvailability = xpath(cc_button_path, document);
+    if ( captionsButtonAvailability == null){
+      captionsButtonAvailability = xpath(captionsButtonOff_xpath, document);
+    }
     const notification_area = document.getElementById("speava_session_notification");
     const feedback_textarea = document.getElementById("speava_textarea");
     const element_caption_reaction = document.getElementById("speava_caption_reaction");
