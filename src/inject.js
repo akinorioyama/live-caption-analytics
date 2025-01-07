@@ -643,15 +643,16 @@ try {
   // Start transcribing
   // -------------------------------------------------------------------------
   const startTranscribing = () => {
-    if (closedCaptionsAttachInterval) {
-      clearInterval(closedCaptionsAttachInterval);
-    }
-
-    // set this to null to force it to increment
-    currentSessionIndex = null;
     // explicit acknowledgement
     const hostname = document.location.hostname;
     if (hostname.match("meet.google") !== null){
+      if (!xpath(captionsButtonOn_xpath, document)){
+        const rejected_text = chrome.i18n.getMessage("inform_missing_start_transcription_button");
+        toast_to_notify(rejected_text, 3000);
+        isTranscribing = !isTranscribing;
+        // reverse the flag so that this can cancel the returning function to set the reverse status
+        return;
+      }
     } else if (hostname.match("zoom") !== null){
     } else {
       const grant_text = chrome.i18n.getMessage("google_speech_to_text_prompt");
@@ -666,7 +667,11 @@ try {
         toast_to_notify(approved_text, 3000);
       }
     }
-
+    if (closedCaptionsAttachInterval) {
+      clearInterval(closedCaptionsAttachInterval);
+    }
+    // set this to null to force it to increment
+    currentSessionIndex = null;
 
     closedCaptionsAttachInterval = setInterval(tryTo(closedCaptionsAttachLoop, 'attach to captions'), 1000);
     setCurrentTranscriptDetails();
@@ -1288,10 +1293,10 @@ try {
           continue;
         } else {
         speaker = node.nextSibling.textContent;
-         if (node.nextSibling.nextSibling !== null){
-            speaker_caption = node.nextSibling.nextSibling.textContent;
+         if (node.parentNode.parentNode !== null){
+            speaker_caption = node.parentNode.parentNode.textContent;
             //console.log(node.getAttribute("data-iml")+speaker+speaker_caption);
-            candidates.push(node.parentNode.parentNode);
+            candidates.push(node.parentNode.parentNode.parentNode);
             // already narrowed down to the leading block
             break;
 
@@ -1698,6 +1703,9 @@ try {
 
               }
             }
+        }).catch(e => {
+        console.log('catch processReceivedReplyNotification', e);
+        speava_async_response_notification = null;
         });
       } catch (e) {
         //console.log('catch', e);

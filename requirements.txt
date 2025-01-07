@@ -1,6 +1,6 @@
 Flask-Cors
 flask
-pandas
+pandas==1.5.3
 configparser
 nltk
 docopt

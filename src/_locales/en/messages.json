@@ -118,5 +118,8 @@
     },
     "confirm_destination_rejected": {
         "message": "You rejected the new URL value. The option screen will close without saving new values."
+    },
+    "inform_missing_start_transcription_button": {
+        "message": "Live transcript button can't be detected. In the configuration of 'Label for captions', set the string of the tooltip text of the live transcript button"
     }
 }

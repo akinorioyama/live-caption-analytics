@@ -116,6 +116,8 @@
     },
     "confirm_destination_rejected": {
         "message": "新しいURL の値を拒否しました。設定画面を保存せずに閉じます。"
+    },
+    "inform_missing_start_transcription_button": {
+        "message": "字幕を表示するボタンが見つかりませんでした。設定'Label for captions'に、字幕を表示するボタンに指定されたツールチップの文字列を指定してください"
     }
-
 }
